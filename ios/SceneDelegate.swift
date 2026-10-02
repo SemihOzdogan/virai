@@ -29,7 +29,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         
         // TODO Add connectionOptions!
         factory.startReactNative(
-            withModuleName: "deneme",
+            withModuleName: "virai",
             in: window!
         )
         

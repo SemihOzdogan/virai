@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "77879130693",
+    "project_id": "deneme-7d49d",
+    "storage_bucket": "deneme-7d49d.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:77879130693:android:f54b7c304e34e8b7cf812c",
+        "android_client_info": {
+          "package_name": "com.virai"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCT9k2GDnt6OePzr1ABW0kg7R49UDrTIjo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

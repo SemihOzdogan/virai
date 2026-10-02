@@ -1,0 +1,120 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function validConversation(data, userId) {
+      return data.userId == userId
+        && data.title is string
+        && data.title.size() > 0
+        && data.title.size() <= 60
+        && data.provider == 'gemini'
+        && data.nextSequence is int
+        && data.nextSequence >= 1
+        && data.isGenerating is bool
+        && (data.generationStartedAt == null || data.generationStartedAt is timestamp)
+        && (data.activeRequestId == null || data.activeRequestId is string)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    match /users/{userId}/conversations/{conversationId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId)
+        && request.resource.data.keys().hasOnly([
+          'userId',
+          'title',
+          'provider',
+          'nextSequence',
+          'isGenerating',
+          'generationStartedAt',
+          'activeRequestId',
+          'createdAt',
+          'updatedAt'
+        ])
+        && validConversation(request.resource.data, userId)
+        && request.resource.data.nextSequence == 1
+        && request.resource.data.isGenerating
+        && request.resource.data.activeRequestId is string
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.createdAt == request.time;
+      allow update: if isOwner(userId)
+        && resource.data.userId == userId
+        && validConversation(request.resource.data, userId)
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.updatedAt == request.time
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'title',
+          'provider',
+          'nextSequence',
+          'isGenerating',
+          'generationStartedAt',
+          'activeRequestId',
+          'updatedAt'
+        ])
+        && request.resource.data.nextSequence >= resource.data.nextSequence
+        && request.resource.data.nextSequence <= resource.data.nextSequence + 1;
+      allow delete: if isOwner(userId)
+        && resource.data.userId == userId;
+
+      match /messages/{messageId} {
+        function conversationAfterWrite() {
+          return getAfter(
+            /databases/$(database)/documents/users/$(userId)/conversations/$(conversationId)
+          ).data;
+        }
+
+        allow read: if isOwner(userId);
+        allow create: if isOwner(userId)
+          && request.resource.data.keys().hasOnly([
+            'role',
+            'content',
+            'sequence',
+            'createdAt',
+            'status',
+            'provider'
+          ])
+          && request.resource.data.role in ['user', 'assistant']
+          && request.resource.data.content is string
+          && request.resource.data.content.size() > 0
+          && request.resource.data.content.size() <= 12000
+          && request.resource.data.sequence is int
+          && request.resource.data.sequence >= 0
+          && request.resource.data.createdAt == request.time
+          && request.resource.data.status == 'complete'
+          && request.resource.data.provider == 'gemini'
+          && conversationAfterWrite().userId == userId
+          && (
+            (
+              request.resource.data.role == 'user'
+              && conversationAfterWrite().isGenerating
+              && request.resource.data.sequence == conversationAfterWrite().nextSequence - 1
+              && conversationAfterWrite().activeRequestId == messageId
+            )
+            ||
+            (
+              request.resource.data.role == 'assistant'
+              && !conversationAfterWrite().isGenerating
+              && request.resource.data.sequence == conversationAfterWrite().nextSequence - 1
+            )
+          );
+        allow update: if isOwner(userId)
+          && resource.data.role == 'user'
+          && resource.data.status == 'complete'
+          && request.resource.data.status == 'failed'
+          && request.resource.data.error is string
+          && request.resource.data.error.size() > 0
+          && request.resource.data.error.size() <= 500
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'error']);
+        allow delete: if isOwner(userId);
+      }
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

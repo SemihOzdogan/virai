@@ -1,19 +1,33 @@
 {
-  "name": "deneme",
+  "name": "virai",
   "version": "0.0.1",
   "private": true,
   "scripts": {
     "android": "react-native run-android",
+    "firebase:deploy": "npx firebase-tools deploy --only firestore:rules",
     "ios": "react-native run-ios",
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest"
   },
   "dependencies": {
+    "@firebase/app": "^0.16.2",
+    "@firebase/auth": "^1.13.6",
+    "@firebase/firestore": "^4.17.2",
+    "@react-native-async-storage/async-storage": "^3.1.1",
+    "@react-native-firebase/ai": "^26.4.0",
+    "@react-native-firebase/app": "^26.4.0",
+    "@react-native-firebase/app-check": "^26.4.0",
+    "@react-native-google-signin/google-signin": "^16.1.5",
+    "@react-native/new-app-screen": "0.87.1",
+    "@react-navigation/native": "^7.5.0",
+    "@react-navigation/stack": "^7.12.0",
     "react": "19.2.3",
     "react-native": "0.87.1",
-    "@react-native/new-app-screen": "0.87.1",
-    "react-native-safe-area-context": "^5.5.2"
+    "react-native-gesture-handler": "^3.3.0",
+    "react-native-safe-area-context": "^5.5.2",
+    "react-native-screens": "^4.28.0",
+    "zustand": "^5.0.15"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
@@ -35,6 +49,9 @@
     "prettier": "2.8.8",
     "react-test-renderer": "19.2.3",
     "typescript": "^6.0.3"
+  },
+  "overrides": {
+    "@grpc/grpc-js": "^1.13.6"
   },
   "engines": {
     "node": ">= 22.11.0"

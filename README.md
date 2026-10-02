@@ -1,97 +1,43 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# virai
 
-# Getting Started
+React Native app with Firebase Authentication, Gemini chat, and Firestore conversation history.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+## Firebase Authentication
 
-## Step 1: Start Metro
+Email/password sign-in, account registration, Google sign-in, password reset, and logout are implemented. New email/password accounts are created in Firebase Authentication and automatically signed in.
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+Firebase Authentication sessions persist across app restarts and expire seven days after the user's most recent successful sign-in. Signing out manually ends the session immediately.
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+1. In Firebase Console, enable **Authentication → Sign-in method → Email/Password** and **Google**.
+2. The Firebase Web app configuration is used by the JavaScript Authentication and Firestore SDKs in `src/config/firebase.ts`.
+3. In **Project settings → Your apps**, register an Android app with package name `com.virai` and an iOS app with bundle ID `com.virai`. App identifiers cannot be changed after registration; if you previously registered `com.deneme`, add new Android and iOS app entries using `com.virai`.
+4. Download each native configuration file:
+   - Android: `google-services.json` → `android/app/google-services.json`
+   - iOS: `GoogleService-Info.plist` → `ios/virai/GoogleService-Info.plist`
+5. For Google Sign-In, register the Android signing SHA-1/SHA-256 fingerprints (`cd android && ./gradlew signingReport`), and complete the OAuth client ID and iOS URL scheme values described in `src/config/firebase.ts` and `ios/virai/Info.plist`.
 
-```sh
-# Using npm
-npm start
+The native Firebase configuration files are required for Firebase AI Logic. They are not generated from the Web app configuration.
 
-# OR using Yarn
-yarn start
-```
+## Gemini chats and conversation history
 
-## Step 2: Build and run your app
+The chat calls Gemini through **Firebase AI Logic** using the Gemini Developer API. Messages are sent from the client; user and assistant messages are written to that authenticated user's Firestore path and are available to reopen and continue. The app does not use Cloud Functions, Groq, or Firebase Storage for chat.
 
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
+### One-time Firebase setup
 
-### Android
+1. In Firebase Console, create a **Cloud Firestore** database.
+2. In **AI Logic**, select the **Gemini Developer API** and enable Gemini for the Firebase project. No Gemini API key or Cloud Functions secret is added to the app.
+3. Add the Android and iOS app registrations and native config files described above, then rebuild the native app.
+4. Deploy the owner-scoped chat rules:
 
-```sh
-# Using npm
-npm run android
+   ```sh
+   npx firebase-tools login
+   npx firebase-tools deploy --only firestore:rules --project deneme-7d49d
+   ```
 
-# OR using Yarn
-yarn android
-```
+5. Run the app with `npm run android` or `npm run ios`.
 
-### iOS
+Firebase AI Logic's Gemini Developer API has a no-cost usage tier where available, but it is quota-limited and can change; free use is not unlimited or guaranteed in every region. Firestore also has usage quotas. Configure Firebase usage alerts and review Google's data and AI service terms before sending sensitive information. Enable Firebase App Check for the AI Logic API before production release to reduce unauthorized usage.
 
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
+The client includes up to 20 previous successful messages as Gemini context. Messages are limited to 6,000 characters, and generated responses are capped at 2,048 output tokens. Conversations and messages are private to the authenticated Firebase user according to `firestore.rules`.
 
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
-npm run ios
-
-# OR using Yarn
-yarn ios
-```
-
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
-
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
-
-## Step 3: Modify your app
-
-Now that you have successfully run the app, let's make changes!
-
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
-
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
-
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
-
-## Congratulations! :tada:
-
-You've successfully run and modified your React Native App. :partying_face:
-
-### Now what?
-
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+If Cloud Functions were deployed during earlier setup, removing their source from this repository does not delete the deployed function. Delete any old `sendChatMessage` function from Firebase Console if it is no longer needed. The App Check package is installed, but no attestation provider is initialized; configure one before enforcing App Check on the AI Logic API.
