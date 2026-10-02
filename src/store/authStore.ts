@@ -15,6 +15,8 @@ type AuthState = {
   isAuthenticated: boolean;
   isAuthReady: boolean;
   isLoading: boolean;
+  isEmailLoginLoading: boolean;
+  isGoogleLoginLoading: boolean;
   error: string | null;
   initialize: () => () => void;
   login: (credentials: LoginCredentials) => Promise<boolean>;
@@ -30,6 +32,8 @@ export const useAuthStore = create<AuthState>((set) => ({
   isAuthenticated: false,
   isAuthReady: false,
   isLoading: false,
+  isEmailLoginLoading: false,
+  isGoogleLoginLoading: false,
   error: null,
   initialize: () =>
     observeFirebaseAuth(
@@ -47,7 +51,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         }),
     ),
   login: async credentials => {
-    set({ isLoading: true, error: null });
+    set({ isLoading: true, isEmailLoginLoading: true, error: null });
 
     try {
       const user = await loginWithEmailAndPassword(credentials);
@@ -55,12 +59,14 @@ export const useAuthStore = create<AuthState>((set) => ({
         user,
         isAuthenticated: true,
         isLoading: false,
+        isEmailLoginLoading: false,
         error: null,
       });
       return true;
     } catch (error) {
       set({
         isLoading: false,
+        isEmailLoginLoading: false,
         error: error instanceof Error ? error.message : 'Giriş sırasında bir hata oluştu.',
       });
       return false;
@@ -87,13 +93,13 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
   loginWithGoogle: async () => {
-    set({ isLoading: true, error: null });
+    set({ isLoading: true, isGoogleLoginLoading: true, error: null });
 
     try {
       const user = await loginWithGoogle();
 
       if (!user) {
-        set({ isLoading: false });
+        set({ isLoading: false, isGoogleLoginLoading: false });
         return false;
       }
 
@@ -101,12 +107,14 @@ export const useAuthStore = create<AuthState>((set) => ({
         user,
         isAuthenticated: true,
         isLoading: false,
+        isGoogleLoginLoading: false,
         error: null,
       });
       return true;
     } catch (error) {
       set({
         isLoading: false,
+        isGoogleLoginLoading: false,
         error: error instanceof Error ? error.message : 'Google ile giriş yapılamadı.',
       });
       return false;

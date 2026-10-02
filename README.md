@@ -1,6 +1,6 @@
 # virai
 
-React Native app with Firebase Authentication, Gemini chat, and Firestore conversation history.
+VirAI is a React Native AI chat app with Firebase Authentication and Firestore conversation history.
 
 ## Firebase Authentication
 
@@ -18,14 +18,14 @@ Firebase Authentication sessions persist across app restarts and expire seven da
 
 The native Firebase configuration files are required for Firebase AI Logic. They are not generated from the Web app configuration.
 
-## Gemini chats and conversation history
+## VirAI chat and conversation history
 
-The chat calls Gemini through **Firebase AI Logic** using the Gemini Developer API. Messages are sent from the client; user and assistant messages are written to that authenticated user's Firestore path and are available to reopen and continue. The app does not use Cloud Functions, Groq, or Firebase Storage for chat.
+VirAI generates chat replies through **Firebase AI Logic**. Messages are sent from the client; user and assistant messages are written to that authenticated user's Firestore path and are available to reopen and continue. The app does not use Cloud Functions, Groq, or Firebase Storage for chat.
 
 ### One-time Firebase setup
 
 1. In Firebase Console, create a **Cloud Firestore** database.
-2. In **AI Logic**, select the **Gemini Developer API** and enable Gemini for the Firebase project. No Gemini API key or Cloud Functions secret is added to the app.
+2. In **AI Logic**, select and enable the AI provider for the Firebase project. No provider API key or Cloud Functions secret is added to the app.
 3. Add the Android and iOS app registrations and native config files described above, then rebuild the native app.
 4. Deploy the owner-scoped chat rules:
 
@@ -36,8 +36,8 @@ The chat calls Gemini through **Firebase AI Logic** using the Gemini Developer A
 
 5. Run the app with `npm run android` or `npm run ios`.
 
-Firebase AI Logic's Gemini Developer API has a no-cost usage tier where available, but it is quota-limited and can change; free use is not unlimited or guaranteed in every region. Firestore also has usage quotas. Configure Firebase usage alerts and review Google's data and AI service terms before sending sensitive information. Enable Firebase App Check for the AI Logic API before production release to reduce unauthorized usage.
+Firebase AI Logic usage may have a no-cost tier, but it is quota-limited and can change; free use is not unlimited or guaranteed in every region. Firestore also has usage quotas. Configure Firebase usage alerts and review Google's data and AI service terms before sending sensitive information. Enable Firebase App Check for the AI Logic API before production release to reduce unauthorized usage.
 
-The client includes up to 20 previous successful messages as Gemini context. Messages are limited to 6,000 characters, and generated responses are capped at 2,048 output tokens. Conversations and messages are private to the authenticated Firebase user according to `firestore.rules`.
+The client includes up to 20 previous successful messages as conversation context. Messages are limited to 6,000 characters, and generated responses are capped at 2,048 output tokens. Conversations and messages are private to the authenticated Firebase user according to `firestore.rules`.
 
 If Cloud Functions were deployed during earlier setup, removing their source from this repository does not delete the deployed function. Delete any old `sendChatMessage` function from Firebase Console if it is no longer needed. The App Check package is installed, but no attestation provider is initialized; configure one before enforcing App Check on the AI Logic API.

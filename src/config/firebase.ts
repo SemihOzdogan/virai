@@ -15,8 +15,10 @@ const firebaseConfig = {
   messagingSenderId: "77879130693",
   appId: "1:77879130693:web:3ba46358540e5d34cf812c",
   measurementId: "G-3BNQ6XVH8W",
-  googleWebClientId: 'YOUR_GOOGLE_WEB_CLIENT_ID',
-  googleIosClientId: 'YOUR_GOOGLE_IOS_CLIENT_ID',
+  googleWebClientId:
+    '77879130693-0usrk3lvpuiun12dls01t20aegd97n4a.apps.googleusercontent.com',
+  googleIosClientId:
+    '77879130693-7l944npn0ir66nt7if5navg7t6cvc146.apps.googleusercontent.com',
 };
 
 const { googleWebClientId, googleIosClientId, ...firebaseAppConfig } = firebaseConfig;

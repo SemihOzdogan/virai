@@ -7,11 +7,13 @@ import { RegisterScreen } from '../screens/RegisterScreen';
 import { HomeScreen } from '../screens/HomeScreen';
 import { ChatScreen } from '../screens/ChatScreen';
 import { useAuthStore } from '../store';
+import { useTheme } from '../theme/ThemeProvider';
 import type { RootStackParamList } from '../types/navigation';
 
 const Stack = createStackNavigator<RootStackParamList>();
 
 export function AppNavigator() {
+  const { colors } = useTheme();
   const isAuthenticated = useAuthStore(state => state.isAuthenticated);
   const isAuthReady = useAuthStore(state => state.isAuthReady);
   const initialize = useAuthStore(state => state.initialize);
@@ -21,7 +23,7 @@ export function AppNavigator() {
   if (!isAuthReady) {
     return (
       <View style={styles.loading}>
-        <ActivityIndicator color="#7C5CFF" size="large" />
+        <ActivityIndicator color={colors.accent} size="large" />
       </View>
     );
   }
@@ -31,7 +33,7 @@ export function AppNavigator() {
       key={isAuthenticated ? 'authenticated' : 'unauthenticated'}
       screenOptions={{
         headerShown: false,
-        cardStyle: { backgroundColor: '#0B1020' },
+        cardStyle: { backgroundColor: colors.background },
       }}>
       {isAuthenticated ? (
         <Stack.Group>
@@ -49,10 +51,5 @@ export function AppNavigator() {
 }
 
 const styles = StyleSheet.create({
-  loading: {
-    flex: 1,
-    backgroundColor: '#0B1020',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });

@@ -45,6 +45,40 @@ export function createConversationId(uid: string) {
   return doc(collection(firestore(), 'users', uid, 'conversations')).id;
 }
 
+function normalizeConversationTitle(title: string) {
+  return title
+    .split('\n', 1)[0]
+    .replace(/^(başlık|title)\s*:\s*/i, '')
+    .replace(/^["'“”‘’]+|["'“”‘’]+$/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 60)
+    .trim();
+}
+
+function getConversationTitleFallback(firstMessage: string) {
+  return normalizeConversationTitle(firstMessage.replace(/[?!.。؟]+$/g, ''));
+}
+
+function isGenericConversationTitle(title: string) {
+  const normalizedTitle = title.toLocaleLowerCase('tr-TR');
+  return /^(yardımcı olma talebi|yardım talebi|genel sohbet|sohbet|yeni sohbet|help request|general conversation|conversation|selamlaşma( ve tanışma)?|tanışma|selam|merhaba|selamlar|hi|hello|hey)$/i.test(
+    normalizedTitle,
+  );
+}
+
+function isGreetingMessage(message: string) {
+  const normalizedMessage = message
+    .toLocaleLowerCase('tr-TR')
+    .replace(/[.,!?;:…]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return /^(selam|merhaba|selamlar|günaydın|iyi günler|iyi akşamlar|hi|hello|hey)( nasılsın| nasılsınız| ne haber| orada mısın| orada mısınız)?$/i.test(
+    normalizedMessage,
+  );
+}
+
 export async function deleteChatConversation(uid: string, conversationId: string) {
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(conversationId)) {
     throw new Error('Sohbet kimliği geçersiz.');
@@ -157,10 +191,15 @@ export async function sendChatMessage(
   const assistantMessageRef = doc(collection(conversationRef, 'messages'));
   const requestStartedAt = Timestamp.now();
   let sequence = 0;
+  let shouldGenerateTitle = false;
 
   await runTransaction(firestore(), async transaction => {
     const conversationSnapshot = await transaction.get(conversationRef);
     const conversation = conversationSnapshot.data();
+    const currentTitle = typeof conversation?.title === 'string' ? conversation.title : '';
+    const needsTitle =
+      !conversationSnapshot.exists() || isGenericConversationTitle(currentTitle);
+    shouldGenerateTitle = needsTitle && !isGreetingMessage(trimmedText);
 
     if (conversation && conversation.userId !== uid) {
       throw new Error('Bu sohbete erişim izniniz yok.');
@@ -202,10 +241,9 @@ export async function sendChatMessage(
       conversationRef,
       {
         userId: uid,
-        title:
-          typeof conversation?.title === 'string' && conversation.title.trim()
-            ? conversation.title.trim().slice(0, 60)
-            : trimmedText.slice(0, 60),
+        title: shouldGenerateTitle
+          ? currentTitle.trim() || trimmedText.slice(0, 60)
+          : 'Yeni sohbet',
         provider: 'gemini',
         ...(conversationSnapshot.exists()
           ? {}
@@ -248,7 +286,34 @@ export async function sendChatMessage(
     const reply = response.response.text().trim();
 
     if (!reply) {
-      throw new Error('Gemini boş bir yanıt döndürdü. Lütfen tekrar deneyin.');
+      throw new Error('Boş bir yanıt alındı. Lütfen tekrar deneyin.');
+    }
+
+    let generatedTitle: string | null = null;
+    if (shouldGenerateTitle) {
+      try {
+        const titleModel = getGenerativeModel(ai, {
+          model: 'gemini-3.1-flash-lite',
+          generationConfig: { maxOutputTokens: 48, temperature: 0.3 },
+        });
+        const titleResponse = await titleModel.generateContent(
+          [
+            'İlk kullanıcı mesajı ve ilk asistan yanıtının asıl konusunu adlandıran kısa, somut bir sohbet başlığı üret.',
+            'Sorudaki kişi, yer ve konu gibi ayırt edici ayrıntıları koru. “Yardımcı olma talebi”, “genel sohbet” veya benzeri belirsiz başlıklar yazma.',
+            'Kullanıcıyla aynı dilde, en fazla 60 karakter yaz. Yalnızca başlığı döndür; açıklama, tırnak veya başlık etiketi ekleme.',
+            'Örnek: Esenler hava durumu hakkında bir soru için “Esenler Hava Durumu” yaz; “Yardımcı olma talebi” yazma.',
+            `Kullanıcı mesajı: ${trimmedText.slice(0, 1200)}`,
+            `Asistan yanıtı: ${reply.slice(0, 1200)}`,
+          ].join('\n\n'),
+        );
+        const title = normalizeConversationTitle(titleResponse.response.text());
+        generatedTitle =
+          title && !isGenericConversationTitle(title)
+            ? title
+            : getConversationTitleFallback(trimmedText) || null;
+      } catch (titleError) {
+        console.warn('Sohbet başlığı oluşturulamadı; ilk mesaj başlığı korunuyor.', titleError);
+      }
     }
 
     await runTransaction(firestore(), async transaction => {
@@ -273,6 +338,7 @@ export async function sendChatMessage(
         provider: 'gemini',
       });
       transaction.update(conversationRef, {
+        ...(shouldGenerateTitle && generatedTitle ? { title: generatedTitle } : {}),
         nextSequence: sequence + 2,
         isGenerating: false,
         generationStartedAt: null,

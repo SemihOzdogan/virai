@@ -1,6 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   ActivityIndicator,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -16,6 +18,7 @@ import type { StackScreenProps } from '@react-navigation/stack';
 
 import { useAuthStore } from '../store';
 import { useChatStore } from '../store/chatStore';
+import { useTheme, type AppTheme } from '../theme/ThemeProvider';
 import type { ChatMessage } from '../types/chat';
 import type { RootStackParamList } from '../types/navigation';
 
@@ -23,7 +26,78 @@ type Props = StackScreenProps<RootStackParamList, 'Chat'>;
 
 const EMPTY_MESSAGES: ChatMessage[] = [];
 
+function formatMessageTime(date: Date | null) {
+  if (!date) {
+    return null;
+  }
+
+  return new Intl.DateTimeFormat('tr-TR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+function TypingIndicator() {
+  const { colors } = useTheme();
+  const dots = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)])
+    .current;
+
+  useEffect(() => {
+    const animations = dots.map((dot, index) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(index * 140),
+          Animated.timing(dot, {
+            toValue: 1,
+            duration: 180,
+            useNativeDriver: true,
+          }),
+          Animated.timing(dot, {
+            toValue: 0,
+            duration: 180,
+            useNativeDriver: true,
+          }),
+          Animated.delay((2 - index) * 140 + 220),
+        ]),
+      ),
+    );
+
+    animations.forEach(animation => animation.start());
+    return () => animations.forEach(animation => animation.stop());
+  }, [dots]);
+
+  return (
+    <View style={animationStyles.typingDots} accessibilityLabel="Yanıt hazırlanıyor">
+      {dots.map((dot, index) => (
+        <Animated.View
+          key={index}
+          style={[
+            animationStyles.typingDot,
+            {
+              backgroundColor: colors.accent,
+              opacity: dot.interpolate({
+                inputRange: [0, 1],
+                outputRange: [0.35, 1],
+              }),
+              transform: [
+                {
+                  translateY: dot.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, -4],
+                  }),
+                },
+              ],
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
 export function ChatScreen({ navigation, route }: Props) {
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { conversationId, title } = route.params;
   const user = useAuthStore(state => state.user);
   const subscribeToMessages = useChatStore(state => state.subscribeToMessages);
@@ -38,11 +112,32 @@ export function ChatScreen({ navigation, route }: Props) {
   const error = useChatStore(state => state.error);
   const clearError = useChatStore(state => state.clearError);
   const [draft, setDraft] = useState('');
+  const [pendingMessage, setPendingMessage] = useState<{
+    text: string;
+    afterSequence: number;
+  } | null>(null);
+  const input = useRef<React.ElementRef<typeof TextInput>>(null);
   const scrollView = useRef<React.ElementRef<typeof ScrollView>>(null);
+  const scrollToLatest = useCallback(() => {
+    requestAnimationFrame(() => scrollView.current?.scrollToEnd({ animated: true }));
+  }, []);
 
   useEffect(() => {
     clearError();
   }, [clearError]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('transitionEnd', event => {
+      if (event.data.closing) {
+        return;
+      }
+
+      input.current?.focus();
+      unsubscribe();
+    });
+
+    return unsubscribe;
+  }, [navigation]);
 
   useEffect(() => {
     if (!user?.id) {
@@ -52,14 +147,48 @@ export function ChatScreen({ navigation, route }: Props) {
     return subscribeToMessages(user.id, conversationId);
   }, [conversationId, subscribeToMessages, user?.id]);
 
+  useEffect(() => {
+    const keyboardSubscription = Keyboard.addListener('keyboardDidShow', scrollToLatest);
+    return () => keyboardSubscription.remove();
+  }, [scrollToLatest]);
+
+  const pendingMessageIsConfirmed =
+    pendingMessage !== null &&
+    messages.some(
+      message =>
+        message.role === 'user' &&
+        message.content === pendingMessage.text &&
+        message.sequence > pendingMessage.afterSequence,
+    );
+  const visibleMessages =
+    pendingMessage && !pendingMessageIsConfirmed
+      ? [
+          ...messages,
+          {
+            id: 'pending-user-message',
+            role: 'user' as const,
+            content: pendingMessage.text,
+            sequence: pendingMessage.afterSequence + 1,
+            createdAt: new Date(),
+            status: 'complete' as const,
+          },
+        ]
+      : messages;
+
   const handleSend = async () => {
     const text = draft.trim();
     if (!text || isSending || isLoadingMessages || !user?.id) {
       return;
     }
 
+    const afterSequence = messages.reduce(
+      (highest, message) => Math.max(highest, message.sequence),
+      -1,
+    );
     setDraft('');
+    setPendingMessage({ text, afterSequence });
     const sent = await sendMessage(user.id, conversationId, text);
+    setPendingMessage(null);
     if (!sent) {
       setDraft(text);
     }
@@ -69,7 +198,7 @@ export function ChatScreen({ navigation, route }: Props) {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
-      <StatusBar barStyle="light-content" />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -77,6 +206,7 @@ export function ChatScreen({ navigation, route }: Props) {
         <View style={styles.header}>
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel="Geri dön"
             onPress={() => navigation.goBack()}
             style={styles.backButton}>
             <Text style={styles.backText}>‹</Text>
@@ -94,25 +224,26 @@ export function ChatScreen({ navigation, route }: Props) {
           ref={scrollView}
           style={styles.messages}
           contentContainerStyle={styles.messagesContent}
-          onContentSizeChange={() => scrollView.current?.scrollToEnd({ animated: true })}
+          onContentSizeChange={scrollToLatest}
+          onLayout={scrollToLatest}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
           {isLoadingMessages ? (
             <View style={styles.loading}>
-              <ActivityIndicator color="#8B72FF" />
+              <ActivityIndicator color={colors.accent} />
             </View>
-          ) : messages.length === 0 ? (
+          ) : visibleMessages.length === 0 ? (
             <View style={styles.welcome}>
               <View style={styles.welcomeMark}>
                 <Text style={styles.welcomeMarkText}>✦</Text>
               </View>
               <Text style={styles.welcomeTitle}>Nasıl yardımcı olabilirim?</Text>
               <Text style={styles.welcomeText}>
-                Sorunu yaz; Gemini yanıtlasın. Sohbetin hesabına kaydedilir.
+                Mesajını yaz, VirAI yanıtlasın. Sohbetin hesabına kaydedilir.
               </Text>
             </View>
           ) : (
-            messages.map(message => (
+            visibleMessages.map(message => (
               <View
                 key={message.id}
                 style={[
@@ -126,14 +257,31 @@ export function ChatScreen({ navigation, route }: Props) {
                 ) : null}
                 <View
                   style={[
-                    styles.messageBubble,
-                    message.role === 'user' ? styles.userBubble : styles.assistantBubble,
-                    message.status === 'failed' && styles.failedBubble,
+                    styles.messageContent,
+                    message.role === 'user' && styles.userMessageContent,
                   ]}>
-                  <Text style={styles.messageText}>{message.content}</Text>
-                  {message.status === 'failed' ? (
-                    <Text style={styles.failedLabel}>
-                      {message.error ?? error ?? 'Yanıt alınamadı. Lütfen tekrar deneyin.'}
+                  <View
+                    style={[
+                      styles.messageBubble,
+                      message.role === 'user' ? styles.userBubble : styles.assistantBubble,
+                      message.status === 'failed' && styles.failedBubble,
+                    ]}>
+                    <Text
+                      style={[
+                        styles.messageText,
+                        message.role === 'user' && styles.userMessageText,
+                      ]}>
+                      {message.content}
+                    </Text>
+                    {message.status === 'failed' ? (
+                      <Text style={styles.failedLabel}>
+                        {message.error ?? error ?? 'Yanıt alınamadı. Lütfen tekrar deneyin.'}
+                      </Text>
+                    ) : null}
+                  </View>
+                  {formatMessageTime(message.createdAt) ? (
+                    <Text style={styles.messageTime}>
+                      {formatMessageTime(message.createdAt)}
                     </Text>
                   ) : null}
                 </View>
@@ -146,10 +294,7 @@ export function ChatScreen({ navigation, route }: Props) {
                 <Text style={styles.assistantMarkText}>✦</Text>
               </View>
               <View style={styles.typingBubble}>
-                <ActivityIndicator color="#A28FFF" size="small" />
-                <Text style={styles.typingText}>
-                  Gemini yanıtlıyor...
-                </Text>
+                <TypingIndicator />
               </View>
             </View>
           ) : null}
@@ -159,10 +304,11 @@ export function ChatScreen({ navigation, route }: Props) {
 
         <View style={styles.composer}>
           <TextInput
+            ref={input}
             value={draft}
             onChangeText={setDraft}
             placeholder="Mesajını yaz..."
-            placeholderTextColor="#7F8CA8"
+            placeholderTextColor={colors.placeholder}
             multiline
             maxLength={6000}
             editable={!isSending}
@@ -183,45 +329,46 @@ export function ChatScreen({ navigation, route }: Props) {
           </Pressable>
         </View>
         <Text style={styles.footerNote}>
-          Mesajlar Gemini'ye iletilir. Yanıtlar yapay zekâ tarafından oluşturulur.
+          Mesajların VirAI tarafından yanıt oluşturmak için işlenir.
         </Text>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0B1020' },
-  container: { flex: 1, backgroundColor: '#0B1020' },
+function createStyles(colors: AppTheme['colors']) {
+  return StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: colors.background },
+  container: { flex: 1, backgroundColor: colors.background },
   header: {
     minHeight: 62,
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 18,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(148,163,184,0.12)',
+    borderBottomColor: colors.border,
   },
   backButton: {
     width: 38,
     height: 38,
     borderRadius: 13,
-    backgroundColor: 'rgba(148,163,184,0.09)',
+    backgroundColor: colors.surfaceRaised,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backText: { color: '#F3F5FF', fontSize: 31, lineHeight: 33, marginTop: -3 },
+  backText: { color: colors.text, fontSize: 31, lineHeight: 33, marginTop: -3 },
   headerTitleWrap: { flex: 1, marginLeft: 12 },
-  headerTitle: { color: '#F3F5FF', fontSize: 15, fontWeight: '700' },
-  headerSubtitle: { color: '#8492B0', fontSize: 11, marginTop: 3 },
+  headerTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
+  headerSubtitle: { color: colors.textMuted, fontSize: 11, marginTop: 3 },
   headerMark: {
     width: 36,
     height: 36,
     borderRadius: 13,
-    backgroundColor: 'rgba(124,92,255,0.18)',
+    backgroundColor: colors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  headerMarkText: { color: '#A28FFF', fontSize: 20 },
+  headerMarkText: { color: colors.accent, fontSize: 20 },
   messages: { flex: 1 },
   messagesContent: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 20 },
   loading: { padding: 28, alignItems: 'center' },
@@ -230,15 +377,15 @@ const styles = StyleSheet.create({
     width: 62,
     height: 62,
     borderRadius: 22,
-    backgroundColor: 'rgba(124,92,255,0.16)',
+    backgroundColor: colors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 18,
   },
-  welcomeMarkText: { color: '#A28FFF', fontSize: 32 },
-  welcomeTitle: { color: '#F0F3FF', fontSize: 20, fontWeight: '700', textAlign: 'center' },
+  welcomeMarkText: { color: colors.accent, fontSize: 32 },
+  welcomeTitle: { color: colors.text, fontSize: 20, fontWeight: '700', textAlign: 'center' },
   welcomeText: {
-    color: '#98A6C3',
+    color: colors.textSecondary,
     fontSize: 14,
     lineHeight: 22,
     textAlign: 'center',
@@ -251,36 +398,40 @@ const styles = StyleSheet.create({
     width: 27,
     height: 27,
     borderRadius: 10,
-    backgroundColor: 'rgba(124,92,255,0.19)',
+    backgroundColor: colors.accentSoft,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 8,
     marginBottom: 2,
   },
-  assistantMarkText: { color: '#A28FFF', fontSize: 15 },
-  messageBubble: { maxWidth: '84%', paddingHorizontal: 15, paddingVertical: 12, borderRadius: 19 },
-  userBubble: { backgroundColor: '#7658F5', borderBottomRightRadius: 6 },
+  assistantMarkText: { color: colors.accent, fontSize: 15 },
+  messageBubble: { maxWidth: '100%', paddingHorizontal: 15, paddingVertical: 12, borderRadius: 19 },
+  messageContent: { maxWidth: '84%', alignItems: 'flex-start' },
+  userMessageContent: { alignItems: 'flex-end' },
+  userBubble: { backgroundColor: colors.userBubble, borderBottomRightRadius: 6 },
   assistantBubble: {
-    backgroundColor: 'rgba(148,163,184,0.1)',
+    backgroundColor: colors.assistantBubble,
     borderWidth: 1,
-    borderColor: 'rgba(148,163,184,0.12)',
+    borderColor: colors.border,
     borderBottomLeftRadius: 6,
   },
   failedBubble: { borderColor: 'rgba(255,138,138,0.5)' },
-  messageText: { color: '#F3F5FF', fontSize: 15, lineHeight: 22 },
-  failedLabel: { color: '#FFAAAA', fontSize: 11, marginTop: 6 },
+  messageText: { color: colors.text, fontSize: 15, lineHeight: 22 },
+  userMessageText: { color: colors.onAccent },
+  messageTime: { color: colors.textMuted, fontSize: 10, marginTop: 4, marginHorizontal: 5 },
+  failedLabel: { color: colors.error, fontSize: 11, marginTop: 6 },
   typingRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
   typingBubble: {
-    flexDirection: 'row',
+    minWidth: 62,
+    height: 42,
     alignItems: 'center',
-    gap: 9,
-    backgroundColor: 'rgba(148,163,184,0.1)',
+    justifyContent: 'center',
+    backgroundColor: colors.assistantBubble,
     borderRadius: 16,
     paddingHorizontal: 13,
     paddingVertical: 10,
   },
-  typingText: { color: '#AFBAD1', fontSize: 12 },
-  error: { color: '#FFAAAA', fontSize: 12, paddingHorizontal: 18, paddingBottom: 7 },
+  error: { color: colors.error, fontSize: 12, paddingHorizontal: 18, paddingBottom: 7 },
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -289,12 +440,12 @@ const styles = StyleSheet.create({
     paddingLeft: 15,
     borderRadius: 24,
     borderWidth: 1,
-    borderColor: 'rgba(148,163,184,0.2)',
-    backgroundColor: '#111A2E',
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
   input: {
     flex: 1,
-    color: '#F3F5FF',
+    color: colors.text,
     fontSize: 15,
     lineHeight: 21,
     maxHeight: 125,
@@ -305,12 +456,18 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 14,
-    backgroundColor: '#7658F5',
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
     marginLeft: 8,
   },
   sendButtonDisabled: { opacity: 0.4 },
   sendButtonText: { color: '#FFFFFF', fontSize: 25, fontWeight: '700', lineHeight: 30 },
-  footerNote: { color: '#66738F', fontSize: 10, textAlign: 'center', paddingVertical: 7 },
+  footerNote: { color: colors.textMuted, fontSize: 10, textAlign: 'center', paddingVertical: 7 },
+  });
+}
+
+const animationStyles = StyleSheet.create({
+  typingDots: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  typingDot: { width: 7, height: 7, borderRadius: 4 },
 });
