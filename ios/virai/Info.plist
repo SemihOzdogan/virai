@@ -40,6 +40,10 @@
 		<key>NSAllowsLocalNetworking</key>
 		<true/>
 	</dict>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>Sesli mesajınızı yazıya çevirmek için mikrofona erişim gerekir.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>Sesli mesajınızı yazıya çevirmek için konuşma tanıma kullanılır.</string>
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UIApplicationSceneManifest</key>

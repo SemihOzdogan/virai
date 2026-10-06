@@ -5,6 +5,7 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  PermissionsAndroid,
   Pressable,
   ScrollView,
   StatusBar,
@@ -18,13 +19,41 @@ import type { StackScreenProps } from '@react-navigation/stack';
 
 import { useAuthStore } from '../store';
 import { useChatStore } from '../store/chatStore';
+import { useSpeechStore } from '../store/speechStore';
 import { useTheme, type AppTheme } from '../theme/ThemeProvider';
 import type { ChatMessage } from '../types/chat';
 import type { RootStackParamList } from '../types/navigation';
 
 type Props = StackScreenProps<RootStackParamList, 'Chat'>;
+type SpeechRecognitionApi = typeof import('react-native-speech-recognition-kit');
 
 const EMPTY_MESSAGES: ChatMessage[] = [];
+const STARTER_PROMPTS = [
+  'Bugün için kısa bir çalışma planı hazırla',
+  'Karmaşık bir konuyu basitçe açıkla',
+  'Bir fikrimi geliştirmeme yardım et',
+];
+
+function getVoiceNotice(error: unknown, fallback: string) {
+  const message = error instanceof Error ? error.message : '';
+  const normalizedMessage = message.toLocaleLowerCase('tr-TR');
+
+  if (normalizedMessage.includes('cancel') || normalizedMessage.includes('iptal')) {
+    return null;
+  }
+  if (normalizedMessage.includes('permission') || normalizedMessage.includes('izin')) {
+    return 'Sesli giriş için mikrofon ve konuşma tanıma izinlerini açın.';
+  }
+  if (
+    normalizedMessage.includes('initialize recognizer') ||
+    normalizedMessage.includes('recognizer not available') ||
+    normalizedMessage.includes('konuşma tanıma kullanılamıyor')
+  ) {
+    return 'Sesli giriş şu anda kullanılamıyor. Mikrofon ve konuşma tanıma izinlerini kontrol edip tekrar deneyin.';
+  }
+
+  return fallback;
+}
 
 function formatMessageTime(date: Date | null) {
   if (!date) {
@@ -108,7 +137,9 @@ export function ChatScreen({ navigation, route }: Props) {
     state => state.loadingMessagesByConversation[conversationId] ?? true,
   );
   const sendMessage = useChatStore(state => state.sendMessage);
-  const isSending = useChatStore(state => state.isSending);
+  const isSending = useChatStore(
+    state => state.sendingByConversation[conversationId] ?? false,
+  );
   const error = useChatStore(state => state.error);
   const clearError = useChatStore(state => state.clearError);
   const [draft, setDraft] = useState('');
@@ -116,6 +147,21 @@ export function ChatScreen({ navigation, route }: Props) {
     text: string;
     afterSequence: number;
   } | null>(null);
+  const [isListening, setIsListening] = useState(false);
+  const [isStartingListening, setIsStartingListening] = useState(false);
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const speechModule = useRef<SpeechRecognitionApi | null>(null);
+  const speechSubscriptions = useRef<{ remove: () => void }[]>([]);
+  const voiceDraftBase = useRef('');
+  const ignoreSpeechErrorsAfterSend = useRef(false);
+  const speechStatus = useSpeechStore(state => state.status);
+  const speechMessageId = useSpeechStore(state => state.messageId);
+  const speechConversationId = useSpeechStore(state => state.conversationId);
+  const playSpeech = useSpeechStore(state => state.play);
+  const stopSpeech = useSpeechStore(state => state.stop);
+  const isPlayerVisible = useSpeechStore(
+    state => state.status !== 'idle' || state.error !== null,
+  );
   const input = useRef<React.ElementRef<typeof TextInput>>(null);
   const scrollView = useRef<React.ElementRef<typeof ScrollView>>(null);
   const scrollToLatest = useCallback(() => {
@@ -132,7 +178,6 @@ export function ChatScreen({ navigation, route }: Props) {
         return;
       }
 
-      input.current?.focus();
       unsubscribe();
     });
 
@@ -151,6 +196,122 @@ export function ChatScreen({ navigation, route }: Props) {
     const keyboardSubscription = Keyboard.addListener('keyboardDidShow', scrollToLatest);
     return () => keyboardSubscription.remove();
   }, [scrollToLatest]);
+
+  useEffect(() => {
+    return () => {
+      const module = speechModule.current;
+      speechSubscriptions.current.forEach(subscription => subscription.remove());
+      speechSubscriptions.current = [];
+      if (module) {
+        try {
+          Promise.resolve(module.destroy()).catch(caughtError => {
+            console.warn('Ses tanıma oturumu kapatılamadı.', caughtError);
+          });
+        } catch (caughtError) {
+          console.warn('Ses tanıma oturumu kapatılamadı.', caughtError);
+        }
+      }
+    };
+  }, []);
+
+  const ensureSpeechModule = async () => {
+    if (!speechModule.current) {
+      const module = await import('react-native-speech-recognition-kit');
+      const { addEventListener, speechRecogntionEvents } = module;
+      speechSubscriptions.current = [
+        addEventListener(speechRecogntionEvents.PARTIAL_RESULTS, onSpeechTranscript),
+        addEventListener(speechRecogntionEvents.RESULTS, onSpeechTranscript),
+        addEventListener(speechRecogntionEvents.END, () => setIsListening(false)),
+        addEventListener(speechRecogntionEvents.ERROR, onSpeechRecognitionError),
+      ];
+      speechModule.current = module;
+    }
+    return speechModule.current;
+  };
+
+  const onSpeechTranscript = (event: { value?: string }) => {
+    const transcript = event.value?.trim();
+    if (transcript) {
+      setDraft(
+        voiceDraftBase.current
+          ? `${voiceDraftBase.current} ${transcript}`
+          : transcript,
+      );
+    }
+  };
+
+  const onSpeechRecognitionError = (event: { message?: string }) => {
+    setIsListening(false);
+    setIsStartingListening(false);
+    const message = event.message ?? 'Ses tanınamadı. Tekrar deneyin.';
+    if (message.toLocaleLowerCase('tr-TR').includes('cancel')) {
+      return;
+    }
+
+    if (ignoreSpeechErrorsAfterSend.current) {
+      return;
+    }
+
+    setVoiceError(getVoiceNotice(new Error(message), 'Ses tanınamadı. Tekrar deneyin.'));
+  };
+
+  const toggleVoiceInput = async () => {
+    if (isListening) {
+      try {
+        await speechModule.current?.stopListening();
+      } catch (caughtError) {
+        setVoiceError(getVoiceNotice(caughtError, 'Sesli giriş durdurulamadı. Tekrar deneyin.'));
+      }
+      setIsListening(false);
+      return;
+    }
+    if (isStartingListening || isSending) {
+      return;
+    }
+
+    setVoiceError(null);
+    ignoreSpeechErrorsAfterSend.current = false;
+    setIsStartingListening(true);
+    try {
+      if (Platform.OS === 'android') {
+        const permission = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.RECORD_AUDIO,
+        );
+        if (permission !== PermissionsAndroid.RESULTS.GRANTED) {
+          throw new Error('Sesli mesaj yazmak için mikrofon izni gereklidir.');
+        }
+      }
+
+      const module = await ensureSpeechModule();
+      const isAvailable = await module.isRecognitionAvailable();
+      if (!isAvailable) {
+        throw new Error('Bu cihazda konuşma tanıma kullanılamıyor.');
+      }
+
+      await module.setRecognitionLanguage('tr-TR');
+      voiceDraftBase.current = draft.trim();
+      Keyboard.dismiss();
+      await module.startListening();
+      setIsListening(true);
+    } catch (caughtError) {
+      setVoiceError(getVoiceNotice(caughtError, 'Sesli giriş başlatılamadı. Tekrar deneyin.'));
+    } finally {
+      setIsStartingListening(false);
+    }
+  };
+
+  const toggleSpeech = async (message: ChatMessage) => {
+    setVoiceError(null);
+    if (
+      speechStatus !== 'idle' &&
+      speechConversationId === conversationId &&
+      speechMessageId === message.id
+    ) {
+      await stopSpeech();
+      return;
+    }
+    await playSpeech(message.content, message.id, conversationId, displayTitle);
+  };
 
   const pendingMessageIsConfirmed =
     pendingMessage !== null &&
@@ -175,21 +336,25 @@ export function ChatScreen({ navigation, route }: Props) {
         ]
       : messages;
 
-  const handleSend = async () => {
-    const text = draft.trim();
+  const handleSend = async (messageText = draft) => {
+    const text = messageText.trim();
     if (!text || isSending || isLoadingMessages || !user?.id) {
       return;
     }
 
+    setVoiceError(null);
+    ignoreSpeechErrorsAfterSend.current = true;
     const afterSequence = messages.reduce(
       (highest, message) => Math.max(highest, message.sequence),
       -1,
     );
-    setDraft('');
+    if (messageText === draft) {
+      setDraft('');
+    }
     setPendingMessage({ text, afterSequence });
     const sent = await sendMessage(user.id, conversationId, text);
     setPendingMessage(null);
-    if (!sent) {
+    if (!sent && messageText === draft) {
       setDraft(text);
     }
   };
@@ -197,7 +362,7 @@ export function ChatScreen({ navigation, route }: Props) {
   const displayTitle = title?.trim() || 'Yeni sohbet';
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={isPlayerVisible ? ['bottom'] : ['top', 'bottom']}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <KeyboardAvoidingView
         style={styles.container}
@@ -241,6 +406,18 @@ export function ChatScreen({ navigation, route }: Props) {
               <Text style={styles.welcomeText}>
                 Mesajını yaz, VirAI yanıtlasın. Sohbetin hesabına kaydedilir.
               </Text>
+              <View style={styles.starterPrompts}>
+                {STARTER_PROMPTS.map(prompt => (
+                  <Pressable
+                    key={prompt}
+                    accessibilityRole="button"
+                    onPress={() => handleSend(prompt)}
+                    disabled={isSending}
+                    style={styles.starterPrompt}>
+                    <Text style={styles.starterPromptText}>{prompt}</Text>
+                  </Pressable>
+                ))}
+              </View>
             </View>
           ) : (
             visibleMessages.map(message => (
@@ -273,10 +450,44 @@ export function ChatScreen({ navigation, route }: Props) {
                       ]}>
                       {message.content}
                     </Text>
+                    {message.role === 'assistant' ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={
+                          speechStatus !== 'idle' &&
+                          speechConversationId === conversationId &&
+                          speechMessageId === message.id
+                            ? 'Sesli okumayı durdur'
+                            : 'Yanıtı sesli dinle'
+                        }
+                        onPress={() => toggleSpeech(message)}
+                        style={styles.speechButton}>
+                        <Text style={styles.speechButtonText}>
+                          {speechStatus !== 'idle' &&
+                          speechConversationId === conversationId &&
+                          speechMessageId === message.id
+                            ? '■ Durdur'
+                            : '▶ Dinle'}
+                        </Text>
+                      </Pressable>
+                    ) : null}
                     {message.status === 'failed' ? (
-                      <Text style={styles.failedLabel}>
-                        {message.error ?? error ?? 'Yanıt alınamadı. Lütfen tekrar deneyin.'}
-                      </Text>
+                      <>
+                        <Text style={styles.failedLabel}>
+                          {message.error ?? error ?? 'Yanıt alınamadı. Lütfen tekrar deneyin.'}
+                        </Text>
+                        {message.role === 'user' ? (
+                          <Pressable
+                            accessibilityRole="button"
+                            onPress={() => handleSend(message.content)}
+                            disabled={isSending || isLoadingMessages}
+                            style={styles.retryButton}>
+                            <Text style={styles.retryButtonText}>
+                              {isSending ? 'Tekrar deneniyor...' : 'Tekrar dene'}
+                            </Text>
+                          </Pressable>
+                        ) : null}
+                      </>
                     ) : null}
                   </View>
                   {formatMessageTime(message.createdAt) ? (
@@ -301,6 +512,7 @@ export function ChatScreen({ navigation, route }: Props) {
         </ScrollView>
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
+        {voiceError ? <Text style={styles.voiceNotice}>ⓘ {voiceError}</Text> : null}
 
         <View style={styles.composer}>
           <TextInput
@@ -311,18 +523,41 @@ export function ChatScreen({ navigation, route }: Props) {
             placeholderTextColor={colors.placeholder}
             multiline
             maxLength={6000}
-            editable={!isSending}
+            editable={!isSending && !isListening}
             style={styles.input}
             accessibilityLabel="Mesajını yaz"
           />
           <Pressable
             accessibilityRole="button"
+            accessibilityLabel={
+              isListening ? 'Sesli girişi durdur' : 'Sesli mesaj yaz'
+            }
+            accessibilityState={{ selected: isListening, busy: isStartingListening }}
+            onPress={toggleVoiceInput}
+            disabled={isSending || isStartingListening}
+            style={[
+              styles.voiceButton,
+              isListening && styles.voiceButtonActive,
+              (isSending || isStartingListening) && styles.sendButtonDisabled,
+            ]}>
+            <Text style={styles.voiceButtonText}>
+              {isStartingListening ? '…' : isListening ? '■' : '🎙'}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
             accessibilityLabel="Mesajı gönder"
-            onPress={handleSend}
-            disabled={!draft.trim() || isSending || isLoadingMessages || !user?.id}
+            onPress={() => handleSend()}
+            disabled={
+              !draft.trim() ||
+              isSending ||
+              isLoadingMessages ||
+              !user?.id ||
+              isListening
+            }
             style={[
               styles.sendButton,
-              (!draft.trim() || isSending || isLoadingMessages || !user?.id) &&
+              (!draft.trim() || isSending || isLoadingMessages || !user?.id || isListening) &&
                 styles.sendButtonDisabled,
             ]}>
             <Text style={styles.sendButtonText}>↑</Text>
@@ -392,6 +627,20 @@ function createStyles(colors: AppTheme['colors']) {
     marginTop: 10,
     maxWidth: 300,
   },
+  starterPrompts: {
+    width: '100%',
+    gap: 8,
+    marginTop: 22,
+  },
+  starterPrompt: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+  starterPromptText: { color: colors.textSecondary, fontSize: 13, textAlign: 'center' },
   messageRow: { flexDirection: 'row', alignItems: 'flex-end', marginVertical: 8 },
   userMessageRow: { justifyContent: 'flex-end' },
   assistantMark: {
@@ -420,6 +669,10 @@ function createStyles(colors: AppTheme['colors']) {
   userMessageText: { color: colors.onAccent },
   messageTime: { color: colors.textMuted, fontSize: 10, marginTop: 4, marginHorizontal: 5 },
   failedLabel: { color: colors.error, fontSize: 11, marginTop: 6 },
+  retryButton: { alignSelf: 'flex-start', marginTop: 9, paddingVertical: 3 },
+  retryButtonText: { color: colors.accent, fontSize: 12, fontWeight: '700' },
+  speechButton: { alignSelf: 'flex-start', marginTop: 10, paddingVertical: 3 },
+  speechButtonText: { color: colors.accent, fontSize: 12, fontWeight: '700' },
   typingRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
   typingBubble: {
     minWidth: 62,
@@ -432,6 +685,12 @@ function createStyles(colors: AppTheme['colors']) {
     paddingVertical: 10,
   },
   error: { color: colors.error, fontSize: 12, paddingHorizontal: 18, paddingBottom: 7 },
+  voiceNotice: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    paddingHorizontal: 18,
+    paddingBottom: 7,
+  },
   composer: {
     flexDirection: 'row',
     alignItems: 'flex-end',
@@ -462,6 +721,17 @@ function createStyles(colors: AppTheme['colors']) {
     marginLeft: 8,
   },
   sendButtonDisabled: { opacity: 0.4 },
+  voiceButton: {
+    width: 38,
+    height: 38,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceRaised,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 6,
+  },
+  voiceButtonActive: { backgroundColor: colors.error },
+  voiceButtonText: { color: colors.textSecondary, fontSize: 16, fontWeight: '700' },
   sendButtonText: { color: '#FFFFFF', fontSize: 25, fontWeight: '700', lineHeight: 30 },
   footerNote: { color: colors.textMuted, fontSize: 10, textAlign: 'center', paddingVertical: 7 },
   });

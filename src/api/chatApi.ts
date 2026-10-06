@@ -108,6 +108,36 @@ export async function deleteChatConversation(uid: string, conversationId: string
   await deleteDoc(getConversationRef(uid, conversationId));
 }
 
+export async function renameChatConversation(
+  uid: string,
+  conversationId: string,
+  title: string,
+) {
+  const normalizedTitle = title.trim();
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(conversationId)) {
+    throw new Error('Sohbet kimliği geçersiz.');
+  }
+  if (!normalizedTitle || normalizedTitle.length > 60) {
+    throw new Error('Sohbet başlığı 1-60 karakter arasında olmalıdır.');
+  }
+
+  await runTransaction(firestore(), async transaction => {
+    const conversationRef = getConversationRef(uid, conversationId);
+    const snapshot = await transaction.get(conversationRef);
+    if (!snapshot.exists() || snapshot.data().userId !== uid) {
+      throw new Error('Bu sohbete erişim izniniz yok.');
+    }
+    if (snapshot.data().isGenerating) {
+      throw new Error('Yanıt hazırlanırken sohbet başlığı değiştirilemez.');
+    }
+
+    transaction.update(conversationRef, {
+      title: normalizedTitle,
+      updatedAt: serverTimestamp(),
+    });
+  });
+}
+
 export function subscribeToConversations(
   uid: string,
   onChange: (conversations: Conversation[]) => void,

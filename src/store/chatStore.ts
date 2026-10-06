@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 import {
   deleteChatConversation,
+  renameChatConversation,
   sendChatMessage,
   subscribeToConversations,
   subscribeToMessages,
@@ -13,12 +14,17 @@ type ChatState = {
   messagesByConversation: Record<string, ChatMessage[]>;
   isLoadingConversations: boolean;
   loadingMessagesByConversation: Record<string, boolean>;
-  isSending: boolean;
+  sendingByConversation: Record<string, boolean>;
   error: string | null;
   subscribeToConversations: (uid: string) => () => void;
   subscribeToMessages: (uid: string, conversationId: string) => () => void;
   sendMessage: (uid: string, conversationId: string, text: string) => Promise<boolean>;
   deleteConversation: (uid: string, conversationId: string) => Promise<boolean>;
+  renameConversation: (
+    uid: string,
+    conversationId: string,
+    title: string,
+  ) => Promise<boolean>;
   clearError: () => void;
 };
 
@@ -27,7 +33,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   messagesByConversation: {},
   isLoadingConversations: true,
   loadingMessagesByConversation: {},
-  isSending: false,
+  sendingByConversation: {},
   error: null,
   subscribeToConversations: uid =>
     subscribeToConversations(
@@ -68,7 +74,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     );
   },
   sendMessage: async (uid, conversationId, text) => {
-    set({ isSending: true, error: null });
+    if (get().sendingByConversation[conversationId]) {
+      return false;
+    }
+
+    set(state => ({
+      sendingByConversation: { ...state.sendingByConversation, [conversationId]: true },
+      error: null,
+    }));
 
     try {
       await sendChatMessage(
@@ -77,13 +90,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
         text,
         get().messagesByConversation[conversationId] ?? [],
       );
-      set({ isSending: false });
+      set(state => ({
+        sendingByConversation: { ...state.sendingByConversation, [conversationId]: false },
+      }));
       return true;
     } catch (error) {
-      set({
-        isSending: false,
+      set(state => ({
+        sendingByConversation: { ...state.sendingByConversation, [conversationId]: false },
         error: error instanceof Error ? error.message : 'Mesaj gönderilemedi.',
-      });
+      }));
       return false;
     }
   },
@@ -96,6 +111,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Sohbet silinemedi.',
+      });
+      return false;
+    }
+  },
+  renameConversation: async (uid, conversationId, title) => {
+    set({ error: null });
+
+    try {
+      await renameChatConversation(uid, conversationId, title);
+      return true;
+    } catch (error) {
+      set({
+        error: error instanceof Error ? error.message : 'Sohbet başlığı değiştirilemedi.',
       });
       return false;
     }

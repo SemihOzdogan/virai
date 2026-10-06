@@ -27,6 +27,18 @@ jest.mock('react-native-svg', () => ({
   Path: () => null,
 }));
 
+jest.mock('@iternio/react-native-tts', () => ({
+  __esModule: true,
+  default: {
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+    stop: jest.fn(() => Promise.resolve(true)),
+    getInitStatus: jest.fn(() => Promise.resolve(true)),
+    setDefaultLanguage: jest.fn(() => Promise.resolve(true)),
+    speak: jest.fn(),
+  },
+}));
+
 jest.mock('../src/api/chatApi', () => ({
   createConversationId: jest.fn(),
   sendChatMessage: jest.fn(),

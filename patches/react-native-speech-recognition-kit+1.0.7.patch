@@ -1,0 +1,15 @@
+diff --git a/node_modules/react-native-speech-recognition-kit/android/src/main/java/com/speechrecognition/SpeechRecognitionModule.kt b/node_modules/react-native-speech-recognition-kit/android/src/main/java/com/speechrecognition/SpeechRecognitionModule.kt
+index 6dbf3f7..1384928 100644
+--- a/node_modules/react-native-speech-recognition-kit/android/src/main/java/com/speechrecognition/SpeechRecognitionModule.kt
++++ b/node_modules/react-native-speech-recognition-kit/android/src/main/java/com/speechrecognition/SpeechRecognitionModule.kt
+@@ -234,7 +234,9 @@ class SpeechRecognitionModule(reactContext: ReactApplicationContext) :
+         return@post
+       }
+ 
+-      initializeSpeechRecognizer()
++      if (speechRecognizer == null || recognizerIntent == null) {
++        initializeSpeechRecognizer()
++      }
+       speechRecognizer?.startListening(recognizerIntent)
+       isListening = true
+       Log.d(TAG, "startListening: Started listening")

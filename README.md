@@ -40,4 +40,8 @@ Firebase AI Logic usage may have a no-cost tier, but it is quota-limited and can
 
 The client includes up to 20 previous successful messages as conversation context. Messages are limited to 6,000 characters, and generated responses are capped at 2,048 output tokens. Conversations and messages are private to the authenticated Firebase user according to `firestore.rules`.
 
+The conversation list supports searching and renaming saved conversations. Failed user messages can be retried, and new conversations show example prompts.
+
+The chat composer supports Turkish speech-to-text through the device's native speech recognition service. The recognized text is placed in the composer for review before sending. Assistant messages can be read aloud with the device's text-to-speech engine; playback continues while navigating between app screens and can be paused, resumed, or stopped from the global mini-player. Microphone and speech-recognition permissions are requested when voice input is first used. Rebuild and reinstall the native app after installing the voice modules. Android emulators need a Google Play system image with Google Speech Services installed and microphone access enabled. iOS also requires the microphone and speech-recognition permission descriptions in `Info.plist`.
+
 If Cloud Functions were deployed during earlier setup, removing their source from this repository does not delete the deployed function. Delete any old `sendChatMessage` function from Firebase Console if it is no longer needed. The App Check package is installed, but no attestation provider is initialized; configure one before enforcing App Check on the AI Logic API.

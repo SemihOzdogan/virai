@@ -1,7 +1,9 @@
 import React from 'react';
 import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
+import { StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { SpeechPlayer } from './src/components/SpeechPlayer';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { ThemeProvider, useTheme } from './src/theme/ThemeProvider';
 
@@ -32,7 +34,17 @@ function ThemedNavigation() {
           primary: colors.accent,
         },
       }}>
-      <AppNavigator />
+      <View style={styles.container}>
+        <SpeechPlayer />
+        <View style={styles.navigator}>
+          <AppNavigator />
+        </View>
+      </View>
     </NavigationContainer>
   );
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  navigator: { flex: 1 },
+});

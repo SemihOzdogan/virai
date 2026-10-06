@@ -10,6 +10,7 @@ import {
   StatusBar,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import type { StackScreenProps } from '@react-navigation/stack';
@@ -18,18 +19,21 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { createConversationId } from '../api/chatApi';
 import { useAuthStore } from '../store';
 import { useChatStore } from '../store/chatStore';
+import { useSpeechStore } from '../store/speechStore';
 import { ThemeSelector } from '../theme/ThemeSelector';
 import { useTheme, type AppTheme } from '../theme/ThemeProvider';
 import type { Conversation } from '../types/chat';
 import type { RootStackParamList } from '../types/navigation';
 
 type Props = StackScreenProps<RootStackParamList, 'Home'>;
-const deleteActionWidth = 76;
+const deleteActionWidth = 48;
+const rowActionsWidth = deleteActionWidth * 2;
 
 type ConversationRowProps = {
   item: Conversation;
   onOpen: (conversation: Conversation) => void;
   onDelete: (conversationId: string) => Promise<boolean>;
+  onRename: (conversation: Conversation) => void;
 };
 
 function formatDate(date: Date | null) {
@@ -45,7 +49,7 @@ function formatDate(date: Date | null) {
   }).format(date);
 }
 
-function ConversationRow({ item, onOpen, onDelete }: ConversationRowProps) {
+function ConversationRow({ item, onOpen, onDelete, onRename }: ConversationRowProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const translateX = useRef(new Animated.Value(0)).current;
@@ -61,24 +65,24 @@ function ConversationRow({ item, onOpen, onDelete }: ConversationRowProps) {
           Math.abs(gesture.dx) > Math.abs(gesture.dy) &&
           (gesture.dx < 0 || isOpen.current),
         onPanResponderMove: (_, gesture) => {
-          const start = isOpen.current ? -deleteActionWidth : 0;
+          const start = isOpen.current ? -rowActionsWidth : 0;
           translateX.setValue(
-            Math.max(-deleteActionWidth, Math.min(0, start + gesture.dx)),
+            Math.max(-rowActionsWidth, Math.min(0, start + gesture.dx)),
           );
         },
         onPanResponderRelease: (_, gesture) => {
           isOpen.current = isOpen.current
-            ? gesture.dx <= deleteActionWidth / 3
-            : gesture.dx < -deleteActionWidth / 3;
+            ? gesture.dx <= rowActionsWidth / 3
+            : gesture.dx < -rowActionsWidth / 3;
           Animated.spring(translateX, {
-            toValue: isOpen.current ? -deleteActionWidth : 0,
+            toValue: isOpen.current ? -rowActionsWidth : 0,
             useNativeDriver: true,
             bounciness: 0,
           }).start();
         },
         onPanResponderTerminate: () => {
           Animated.spring(translateX, {
-            toValue: isOpen.current ? -deleteActionWidth : 0,
+            toValue: isOpen.current ? -rowActionsWidth : 0,
             useNativeDriver: true,
             bounciness: 0,
           }).start();
@@ -100,56 +104,74 @@ function ConversationRow({ item, onOpen, onDelete }: ConversationRowProps) {
   return (
     <>
       <View style={styles.conversationRow}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={`${item.title} sohbetini sil`}
-          disabled={isDeleting}
-          onPress={() => setDeleteConfirmationVisible(true)}
-          android_ripple={{ color: 'rgba(255,255,255,0.14)' }}
-          style={({ pressed }) => [
-            styles.deleteButton,
-            pressed && styles.deleteButtonPressed,
-          ]}>
-          {isDeleting ? (
-            <ActivityIndicator color={colors.onAccent} size="small" />
-          ) : (
-            <View style={styles.deleteButtonContent}>
-              <View style={styles.deleteIconBackground}>
-                <View style={styles.trashLid}>
-                  <View style={styles.trashHandle} />
-                </View>
-                <View style={styles.trashCan}>
-                  <View style={styles.trashLine} />
-                  <View style={styles.trashLine} />
+        <View style={styles.rowActions}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${item.title} sohbetinin başlığını düzenle`}
+            onPress={() => onRename(item)}
+            style={({ pressed }) => [
+              styles.rowActionButton,
+              styles.renameActionButton,
+              pressed && styles.deleteButtonPressed,
+            ]}>
+            <View style={styles.renameIconBackground}>
+              <Text style={styles.renameActionText}>✎</Text>
+            </View>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={`${item.title} sohbetini sil`}
+            disabled={isDeleting}
+            onPress={() => setDeleteConfirmationVisible(true)}
+            android_ripple={{ color: 'rgba(255,255,255,0.14)' }}
+            style={({ pressed }) => [
+              styles.rowActionButton,
+              styles.deleteButton,
+              pressed && styles.deleteButtonPressed,
+            ]}>
+            {isDeleting ? (
+              <ActivityIndicator color={colors.onAccent} size="small" />
+            ) : (
+              <View style={styles.deleteButtonContent}>
+                <View style={styles.deleteIconBackground}>
+                  <View style={styles.trashLid}>
+                    <View style={styles.trashHandle} />
+                  </View>
+                  <View style={styles.trashCan}>
+                    <View style={styles.trashLine} />
+                    <View style={styles.trashLine} />
+                  </View>
                 </View>
               </View>
-            </View>
-          )}
-        </Pressable>
+            )}
+          </Pressable>
+        </View>
         <Animated.View
           {...panResponder.panHandlers}
           style={[
             styles.conversationForeground,
             { transform: [{ translateX }] },
           ]}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityHint="Sola kaydırarak silme seçeneğini göster"
-            onPress={() => onOpen(item)}
-            style={styles.conversationCard}>
-            <View style={styles.conversationIcon}>
-              <Text style={styles.conversationIconText}>✦</Text>
-            </View>
-            <View style={styles.conversationContent}>
-              <Text numberOfLines={1} style={styles.conversationTitle}>
-                {item.title}
-              </Text>
-              <Text style={styles.conversationMeta}>
-                VirAI · {formatDate(item.updatedAt)}
-              </Text>
-            </View>
-            <Text style={styles.chevron}>›</Text>
-          </Pressable>
+          <View style={styles.conversationCard}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityHint="Sola kaydırarak düzenleme ve silme seçeneklerini göster"
+              onPress={() => onOpen(item)}
+              style={styles.conversationOpenButton}>
+              <View style={styles.conversationIcon}>
+                <Text style={styles.conversationIconText}>✦</Text>
+              </View>
+              <View style={styles.conversationContent}>
+                <Text numberOfLines={1} style={styles.conversationTitle}>
+                  {item.title}
+                </Text>
+                <Text style={styles.conversationMeta}>
+                  VirAI · {formatDate(item.updatedAt)}
+                </Text>
+              </View>
+              <Text style={styles.chevron}>›</Text>
+            </Pressable>
+          </View>
         </Animated.View>
       </View>
       <Modal
@@ -201,8 +223,16 @@ export function HomeScreen({ navigation }: Props) {
   const error = useChatStore(state => state.error);
   const clearError = useChatStore(state => state.clearError);
   const deleteConversation = useChatStore(state => state.deleteConversation);
+  const renameConversation = useChatStore(state => state.renameConversation);
+  const isPlayerVisible = useSpeechStore(
+    state => state.status !== 'idle' || state.error !== null,
+  );
   const [isProfileMenuVisible, setProfileMenuVisible] = useState(false);
   const [isLogoutConfirmationVisible, setLogoutConfirmationVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [conversationToRename, setConversationToRename] = useState<Conversation | null>(null);
+  const [renameTitle, setRenameTitle] = useState('');
+  const [isRenaming, setIsRenaming] = useState(false);
 
   useEffect(() => {
     if (!user?.id) {
@@ -247,16 +277,48 @@ export function HomeScreen({ navigation }: Props) {
       ? deleteConversation(user.id, conversationId)
       : Promise.resolve(false);
 
+  const openRenameDialog = (conversation: Conversation) => {
+    clearError();
+    setConversationToRename(conversation);
+    setRenameTitle(conversation.title);
+  };
+
+  const saveConversationTitle = async () => {
+    if (!user?.id || !conversationToRename || isRenaming) {
+      return;
+    }
+
+    const title = renameTitle.trim();
+    if (!title || title.length > 60) {
+      return;
+    }
+
+    setIsRenaming(true);
+    const renamed = await renameConversation(user.id, conversationToRename.id, title);
+    setIsRenaming(false);
+    if (renamed) {
+      setConversationToRename(null);
+    }
+  };
+
+  const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase('tr-TR');
+  const visibleConversations = normalizedSearchQuery
+    ? conversations.filter(conversation =>
+        conversation.title.toLocaleLowerCase('tr-TR').includes(normalizedSearchQuery),
+      )
+    : conversations;
+
   const renderConversation = ({ item }: { item: Conversation }) => (
     <ConversationRow
       item={item}
       onOpen={openConversation}
       onDelete={handleDeleteConversation}
+      onRename={openRenameDialog}
     />
   );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top', 'bottom']}>
+    <SafeAreaView style={styles.safeArea} edges={isPlayerVisible ? ['bottom'] : ['top', 'bottom']}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <View style={styles.container}>
         <View style={styles.header}>
@@ -302,6 +364,18 @@ export function HomeScreen({ navigation }: Props) {
           <Text style={styles.listCount}>{conversations.length}</Text>
         </View>
 
+        {conversations.length > 0 ? (
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Sohbetlerde ara..."
+            placeholderTextColor={colors.placeholder}
+            returnKeyType="search"
+            accessibilityLabel="Sohbetlerde ara"
+            style={styles.searchInput}
+          />
+        ) : null}
+
         {error ? <Text style={styles.error}>{error}</Text> : null}
 
         {isLoadingConversations ? (
@@ -314,9 +388,14 @@ export function HomeScreen({ navigation }: Props) {
             <Text style={styles.emptyTitle}>Henüz sohbet yok</Text>
             <Text style={styles.emptyText}>İlk sohbetini başlatınca burada görünecek.</Text>
           </View>
+        ) : visibleConversations.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyTitle}>Sonuç bulunamadı</Text>
+            <Text style={styles.emptyText}>Farklı bir sohbet adıyla tekrar ara.</Text>
+          </View>
         ) : (
           <FlatList
-            data={conversations}
+            data={visibleConversations}
             keyExtractor={item => item.id}
             renderItem={renderConversation}
             contentContainerStyle={styles.listContent}
@@ -324,6 +403,50 @@ export function HomeScreen({ navigation }: Props) {
           />
         )}
       </View>
+      <Modal
+        animationType="fade"
+        transparent
+        visible={conversationToRename !== null}
+        onRequestClose={() => setConversationToRename(null)}
+        statusBarTranslucent>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Başlık düzenlemeyi kapat"
+          onPress={() => setConversationToRename(null)}
+          style={styles.modalBackdrop}>
+          <Pressable style={styles.deleteConfirmation} onPress={() => { }}>
+            <Text style={styles.deleteConfirmationTitle}>Sohbet başlığını düzenle</Text>
+            <TextInput
+              value={renameTitle}
+              onChangeText={setRenameTitle}
+              maxLength={60}
+              autoFocus
+              selectTextOnFocus
+              accessibilityLabel="Yeni sohbet başlığı"
+              style={styles.renameInput}
+            />
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            <View style={styles.deleteConfirmationActions}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setConversationToRename(null)}
+                disabled={isRenaming}
+                style={styles.deleteCancelButton}>
+                <Text style={styles.deleteCancelText}>Vazgeç</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={saveConversationTitle}
+                disabled={isRenaming || !renameTitle.trim()}
+                style={styles.deleteConfirmButton}>
+                <Text style={styles.deleteConfirmText}>
+                  {isRenaming ? 'Kaydediliyor...' : 'Kaydet'}
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
       <Modal
         animationType="fade"
         transparent
@@ -478,18 +601,53 @@ function createStyles(colors: AppTheme['colors']) {
       fontSize: 12,
     },
     listContent: { paddingBottom: 10 },
+    searchInput: {
+      color: colors.text,
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: 14,
+      paddingHorizontal: 14,
+      paddingVertical: 11,
+      marginBottom: 8,
+      fontSize: 14,
+    },
     conversationRow: {
       overflow: 'hidden',
       position: 'relative',
     },
-    deleteButton: {
-      alignItems: 'center',
+    rowActions: {
+      alignItems: 'stretch',
       bottom: 0,
-      justifyContent: 'center',
+      flexDirection: 'row',
       position: 'absolute',
       right: 0,
       top: 0,
+      width: rowActionsWidth,
+    },
+    rowActionButton: {
+      alignItems: 'center',
+      justifyContent: 'center',
       width: deleteActionWidth,
+    },
+    renameActionButton: {
+      backgroundColor: 'transparent',
+    },
+    renameIconBackground: {
+      alignItems: 'center',
+      backgroundColor: colors.accent,
+      borderRadius: 19,
+      height: 38,
+      justifyContent: 'center',
+      width: 38,
+    },
+    renameActionText: {
+      color: '#FFFFFF',
+      fontSize: 21,
+      fontWeight: '700',
+    },
+    deleteButton: {
+      backgroundColor: 'transparent',
     },
     deleteButtonPressed: {
       opacity: 0.8,
@@ -546,9 +704,14 @@ function createStyles(colors: AppTheme['colors']) {
     conversationCard: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: 13,
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
+    },
+    conversationOpenButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 13,
     },
     conversationIcon: {
       width: 40,
@@ -605,6 +768,17 @@ function createStyles(colors: AppTheme['colors']) {
       fontSize: 14,
       lineHeight: 21,
       marginTop: 10,
+    },
+    renameInput: {
+      color: colors.text,
+      backgroundColor: colors.input,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      marginTop: 16,
+      fontSize: 15,
     },
     deleteConfirmationActions: {
       flexDirection: 'row',
