@@ -27,13 +27,17 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         reactNativeDelegate = delegate
         reactNativeFactory = factory
         
-        // TODO Add connectionOptions!
         factory.startReactNative(
             withModuleName: "virai",
             in: window!
         )
         
         window?.makeKeyAndVisible()
+    }
+
+    func scene(_ scene: UIScene, openURLContexts URLContexts: Set<UIOpenURLContext>) {
+        guard let url = URLContexts.first?.url else { return }
+        RCTLinkingManager.application(UIApplication.shared, open: url, options: [:])
     }
 }
 

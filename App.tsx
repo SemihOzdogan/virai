@@ -1,13 +1,26 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { DarkTheme, DefaultTheme, NavigationContainer } from '@react-navigation/native';
-import { StyleSheet, View } from 'react-native';
+import { Linking, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { SpeechPlayer } from './src/components/SpeechPlayer';
 import { AppNavigator } from './src/navigation/AppNavigator';
+import { useSpeechStore } from './src/store/speechStore';
 import { ThemeProvider, useTheme } from './src/theme/ThemeProvider';
 
 export default function App() {
+  useEffect(() => {
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      handleLiveActivityAction(url);
+    });
+
+    Linking.getInitialURL()
+      .then(handleLiveActivityAction)
+      .catch(error => console.warn('Could not read the initial app URL:', error));
+
+    return () => subscription.remove();
+  }, []);
+
   return (
     <SafeAreaProvider>
       <ThemeProvider>
@@ -15,6 +28,18 @@ export default function App() {
       </ThemeProvider>
     </SafeAreaProvider>
   );
+}
+
+function handleLiveActivityAction(url: string | null | undefined) {
+  const speech = useSpeechStore.getState();
+
+  if (url === 'virai://speech/pause') {
+    speech.pause().catch(error => console.warn('Could not pause speech:', error));
+  } else if (url === 'virai://speech/resume') {
+    speech.resume().catch(error => console.warn('Could not resume speech:', error));
+  } else if (url === 'virai://speech/stop') {
+    speech.stop().catch(error => console.warn('Could not stop speech:', error));
+  }
 }
 
 function ThemedNavigation() {

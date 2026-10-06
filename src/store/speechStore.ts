@@ -1,7 +1,13 @@
 import { create } from 'zustand';
 
+import {
+  endSpeechLiveActivity,
+  startSpeechLiveActivity,
+  updateSpeechLiveActivity,
+} from '../utils/liveActivity';
+
 type SpeechStatus = 'idle' | 'playing' | 'paused';
-type TtsEventName = 'tts-finish' | 'tts-pause' | 'tts-resume';
+type TtsEventName = 'tts-finish' | 'tts-pause' | 'tts-resume' | 'tts-cancel';
 type TtsApi = {
   addEventListener: (
     eventName: TtsEventName,
@@ -41,14 +47,24 @@ function ensureTtsModule() {
   if (!ttsModule) {
     const tts = require('@iternio/react-native-tts').default as TtsApi;
     tts.addEventListener('tts-finish', clearPlayback);
-    tts.addEventListener('tts-pause', () => useSpeechStore.setState({ status: 'paused' }));
-    tts.addEventListener('tts-resume', () => useSpeechStore.setState({ status: 'playing' }));
+    tts.addEventListener('tts-cancel', clearPlayback);
+    tts.addEventListener('tts-pause', () => setPlaybackStatus('paused'));
+    tts.addEventListener('tts-resume', () => setPlaybackStatus('playing'));
     ttsModule = tts;
   }
   return ttsModule;
 }
 
+function setPlaybackStatus(status: Exclude<SpeechStatus, 'idle'>) {
+  if (useSpeechStore.getState().status === status) {
+    return;
+  }
+  useSpeechStore.setState({ status });
+  updateSpeechLiveActivity(status);
+}
+
 function clearPlayback() {
+  endSpeechLiveActivity();
   useSpeechStore.setState({
     status: 'idle',
     text: null,
@@ -74,6 +90,7 @@ export const useSpeechStore = create<SpeechState>(set => ({
       await tts.setIgnoreSilentSwitch('ignore');
       await tts.setDefaultLanguage('tr-TR');
       set({ status: 'playing', text, messageId, conversationId, conversationTitle });
+      startSpeechLiveActivity(conversationTitle);
       await tts.speak(text);
     } catch (error) {
       clearPlayback();
@@ -88,7 +105,8 @@ export const useSpeechStore = create<SpeechState>(set => ({
     }
     try {
       await ensureTtsModule().pause();
-      set({ status: 'paused', error: null });
+      set({ error: null });
+      setPlaybackStatus('paused');
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Ses duraklatılamadı.' });
     }
@@ -99,7 +117,8 @@ export const useSpeechStore = create<SpeechState>(set => ({
     }
     try {
       await ensureTtsModule().resume();
-      set({ status: 'playing', error: null });
+      set({ error: null });
+      setPlaybackStatus('playing');
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Ses devam ettirilemedi.' });
     }
