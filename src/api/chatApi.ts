@@ -18,12 +18,22 @@ import {
 } from '@firebase/firestore';
 
 import { getFirebaseApp } from '../config/firebase';
-import type { ChatMessage, Conversation } from '../types/chat';
+import type { ChatMessage, ChatMode, Conversation } from '../types/chat';
 
 const firestore = () => getFirestore(getFirebaseApp());
 const maxMessageLength = 6000;
 const maxHistoryMessages = 20;
 const staleRequestMs = 180_000;
+
+const INTERVIEW_SYSTEM_INSTRUCTION = [
+  'Sen Türkçe konuşan deneyimli ve destekleyici bir iş görüşmesi mülakatçısısın.',
+  'Bu bir mülakat simülasyonudur. Kullanıcı adaydır.',
+  'İlk yanıtta adaydan hedeflediği pozisyonu, deneyim seviyesini ve varsa şirket/alanı iste; sonra tek seferde yalnızca bir açık uçlu soru sor.',
+  'Her aday yanıtından sonra 2-3 kısa, somut geri bildirim ver: güçlü yön, geliştirilecek nokta ve daha iyi bir cevap ipucu. Ardından bir sonraki soruyu sor.',
+  'Soruları pozisyona göre uyarlayıp davranışsal, teknik veya vaka sorularını dengeli kullan.',
+  'Kullanıcı görüşmeyi bitirdiğini söylerse; iletişim, içerik, yapı ve pozisyona uygunluk başlıklarında kısa bir değerlendirme ile üç sonraki adım ver.',
+  'Uydurma bilgi isteme veya kesin işe alım sonucu vaat etme. Yanıtların net ve teşvik edici olsun.',
+].join(' ');
 
 function asDate(value: unknown) {
   return value instanceof Timestamp ? value.toDate() : null;
@@ -160,6 +170,7 @@ export function subscribeToConversations(
             title: String(data.title ?? 'Yeni sohbet'),
             provider: 'gemini',
             updatedAt: asDate(data.updatedAt),
+            mode: data.mode === 'interview' ? 'interview' : 'general',
           };
         }),
       ),
@@ -206,6 +217,7 @@ export async function sendChatMessage(
   conversationId: string,
   text: string,
   previousMessages: ChatMessage[],
+  mode: ChatMode = 'general',
 ) {
   const trimmedText = text.trim();
   if (!trimmedText || trimmedText.length > maxMessageLength) {
@@ -214,6 +226,9 @@ export async function sendChatMessage(
 
   if (!/^[A-Za-z0-9_-]{1,128}$/.test(conversationId)) {
     throw new Error('Sohbet kimliği geçersiz.');
+  }
+  if (mode !== 'general' && mode !== 'interview') {
+    throw new Error('Sohbet modu geçersiz.');
   }
 
   const conversationRef = getConversationRef(uid, conversationId);
@@ -275,6 +290,7 @@ export async function sendChatMessage(
           ? currentTitle.trim() || trimmedText.slice(0, 60)
           : 'Yeni sohbet',
         provider: 'gemini',
+        mode,
         ...(conversationSnapshot.exists()
           ? {}
           : {
@@ -311,6 +327,7 @@ export async function sendChatMessage(
     const model = getGenerativeModel(ai, {
       model: 'gemini-3.1-flash-lite',
       generationConfig: { maxOutputTokens: 2048 },
+      ...(mode === 'interview' ? { systemInstruction: INTERVIEW_SYSTEM_INSTRUCTION } : {}),
     });
     const response = await model.startChat({ history }).sendMessage(trimmedText);
     const reply = response.response.text().trim();

@@ -33,6 +33,11 @@ const STARTER_PROMPTS = [
   'Karmaşık bir konuyu basitçe açıkla',
   'Bir fikrimi geliştirmeme yardım et',
 ];
+const INTERVIEW_STARTER_PROMPTS = [
+  'Yazılım geliştirici pozisyonu için pratik yapmak istiyorum',
+  'Yeni mezun ürün yöneticisi mülakatına hazırlanıyorum',
+  'Satış uzmanı rolü için mülakat simülasyonu yapalım',
+];
 
 function getVoiceNotice(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : '';
@@ -127,7 +132,7 @@ function TypingIndicator() {
 export function ChatScreen({ navigation, route }: Props) {
   const { colors, isDark } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { conversationId, title } = route.params;
+  const { conversationId, title, mode = 'general' } = route.params;
   const user = useAuthStore(state => state.user);
   const subscribeToMessages = useChatStore(state => state.subscribeToMessages);
   const messages = useChatStore(
@@ -352,14 +357,16 @@ export function ChatScreen({ navigation, route }: Props) {
       setDraft('');
     }
     setPendingMessage({ text, afterSequence });
-    const sent = await sendMessage(user.id, conversationId, text);
+    const sent = await sendMessage(user.id, conversationId, text, mode);
     setPendingMessage(null);
     if (!sent && messageText === draft) {
       setDraft(text);
     }
   };
 
-  const displayTitle = title?.trim() || 'Yeni sohbet';
+  const isInterview = mode === 'interview';
+  const displayTitle = title?.trim() || (isInterview ? 'Mülakat simülasyonu' : 'Yeni sohbet');
+  const starterPrompts = isInterview ? INTERVIEW_STARTER_PROMPTS : STARTER_PROMPTS;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={isPlayerVisible ? ['bottom'] : ['top', 'bottom']}>
@@ -378,7 +385,7 @@ export function ChatScreen({ navigation, route }: Props) {
           </Pressable>
           <View style={styles.headerTitleWrap}>
             <Text numberOfLines={1} style={styles.headerTitle}>{displayTitle}</Text>
-            <Text style={styles.headerSubtitle}>AI Asistan</Text>
+            <Text style={styles.headerSubtitle}>{isInterview ? 'Mülakat koçu' : 'AI Asistan'}</Text>
           </View>
           <View style={styles.headerMark}>
             <Text style={styles.headerMarkText}>✦</Text>
@@ -402,12 +409,16 @@ export function ChatScreen({ navigation, route }: Props) {
               <View style={styles.welcomeMark}>
                 <Text style={styles.welcomeMarkText}>✦</Text>
               </View>
-              <Text style={styles.welcomeTitle}>Nasıl yardımcı olabilirim?</Text>
+              <Text style={styles.welcomeTitle}>
+                {isInterview ? 'Mülakata hazır mısın?' : 'Nasıl yardımcı olabilirim?'}
+              </Text>
               <Text style={styles.welcomeText}>
-                Mesajını yaz, VirAI yanıtlasın. Sohbetin hesabına kaydedilir.
+                {isInterview
+                  ? 'Hedeflediğin rolü yaz; VirAI sırayla soru sorup her yanıtına geri bildirim versin.'
+                  : 'Mesajını yaz, VirAI yanıtlasın. Sohbetin hesabına kaydedilir.'}
               </Text>
               <View style={styles.starterPrompts}>
-                {STARTER_PROMPTS.map(prompt => (
+                {starterPrompts.map(prompt => (
                   <Pressable
                     key={prompt}
                     accessibilityRole="button"
@@ -519,13 +530,13 @@ export function ChatScreen({ navigation, route }: Props) {
             ref={input}
             value={draft}
             onChangeText={setDraft}
-            placeholder="Mesajını yaz..."
+            placeholder={isInterview ? 'Yanıtını yaz...' : 'Mesajını yaz...'}
             placeholderTextColor={colors.placeholder}
             multiline
             maxLength={6000}
             editable={!isSending && !isListening}
             style={styles.input}
-            accessibilityLabel="Mesajını yaz"
+            accessibilityLabel={isInterview ? 'Mülakat yanıtını yaz' : 'Mesajını yaz'}
           />
           <Pressable
             accessibilityRole="button"

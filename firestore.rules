@@ -12,6 +12,7 @@ service cloud.firestore {
         && data.title.size() > 0
         && data.title.size() <= 60
         && data.provider == 'gemini'
+        && (!data.keys().hasAny(['mode']) || data.mode in ['general', 'interview'])
         && data.nextSequence is int
         && data.nextSequence >= 1
         && data.isGenerating is bool
@@ -28,6 +29,7 @@ service cloud.firestore {
           'userId',
           'title',
           'provider',
+          'mode',
           'nextSequence',
           'isGenerating',
           'generationStartedAt',
@@ -49,6 +51,7 @@ service cloud.firestore {
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'title',
           'provider',
+          'mode',
           'nextSequence',
           'isGenerating',
           'generationStartedAt',

@@ -251,6 +251,18 @@ export function HomeScreen({ navigation }: Props) {
     navigation.navigate('Chat', { conversationId });
   };
 
+  const startInterview = () => {
+    if (!user?.id) {
+      return;
+    }
+
+    navigation.navigate('Chat', {
+      conversationId: createConversationId(user.id),
+      title: 'Mülakat simülasyonu',
+      mode: 'interview',
+    });
+  };
+
   const handleLogout = async () => {
     setProfileMenuVisible(false);
     setLogoutConfirmationVisible(false);
@@ -269,6 +281,7 @@ export function HomeScreen({ navigation }: Props) {
     navigation.navigate('Chat', {
       conversationId: conversation.id,
       title: conversation.title,
+      mode: conversation.mode,
     });
   };
 
@@ -357,6 +370,21 @@ export function HomeScreen({ navigation }: Props) {
             <Text style={styles.newChatSubtitle}>VirAI ile başla</Text>
           </View>
           <Text style={styles.newChatArrow}>›</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Mülakat simülasyonunu başlat"
+          onPress={startInterview}
+          style={styles.interviewButton}>
+          <View style={styles.interviewIcon}>
+            <Text style={styles.interviewIconText}>⌁</Text>
+          </View>
+          <View style={styles.newChatCopy}>
+            <Text style={styles.interviewTitle}>Mülakat simülasyonu</Text>
+            <Text style={styles.interviewSubtitle}>Soruları yanıtla, anlık geri bildirim al</Text>
+          </View>
+          <Text style={styles.interviewArrow}>›</Text>
         </Pressable>
 
         <View style={styles.listHeader}>
@@ -583,6 +611,29 @@ function createStyles(colors: AppTheme['colors']) {
     newChatTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
     newChatSubtitle: { color: '#E0D9FF', fontSize: 12, marginTop: 4 },
     newChatArrow: { color: '#FFFFFF', fontSize: 27, fontWeight: '300' },
+    interviewButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 14,
+      borderRadius: 18,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginTop: 10,
+    },
+    interviewIcon: {
+      width: 38,
+      height: 38,
+      borderRadius: 13,
+      backgroundColor: colors.accentSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 12,
+    },
+    interviewIconText: { color: colors.accent, fontSize: 22, fontWeight: '700' },
+    interviewTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
+    interviewSubtitle: { color: colors.textSecondary, fontSize: 12, marginTop: 3 },
+    interviewArrow: { color: colors.textMuted, fontSize: 25, fontWeight: '300' },
     listHeader: {
       flexDirection: 'row',
       alignItems: 'center',
