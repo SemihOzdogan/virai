@@ -8,8 +8,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { restoreAdventure, totalTurns } from '../adventure/story';
 
 const channelId = 'adventure-reminders';
-const reminderHour = 3;
-const reminderMinute = 3;
+const reminderHour = 12;
+const reminderMinute = 0;
 
 function reminderId(uid: string) {
   return `adventure-307-${uid}`;
