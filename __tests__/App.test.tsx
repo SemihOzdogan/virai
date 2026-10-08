@@ -47,7 +47,12 @@ jest.mock('../src/api/chatApi', () => ({
 }));
 
 jest.mock('@react-navigation/native', () => ({
-  NavigationContainer: ({ children }: { children: React.ReactNode }) => children,
+  NavigationContainer: ({ children }: { children: React.ReactNode }) =>
+    children,
+  createNavigationContainerRef: () => ({
+    isReady: jest.fn(() => true),
+    navigate: jest.fn(),
+  }),
 }));
 
 jest.mock('@react-navigation/stack', () => ({

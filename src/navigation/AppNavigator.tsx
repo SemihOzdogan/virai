@@ -5,6 +5,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { LoginScreen } from '../screens/LoginScreen';
 import { RegisterScreen } from '../screens/RegisterScreen';
 import { HomeScreen } from '../screens/HomeScreen';
+import { AdventureScreen } from '../screens/AdventureScreen';
 import { ChatScreen } from '../screens/ChatScreen';
 import { useAuthStore } from '../store';
 import { useTheme } from '../theme/ThemeProvider';
@@ -38,6 +39,7 @@ export function AppNavigator() {
       {isAuthenticated ? (
         <Stack.Group>
           <Stack.Screen name="Home" component={HomeScreen} />
+          <Stack.Screen name="Adventure" component={AdventureScreen} />
           <Stack.Screen name="Chat" component={ChatScreen} />
         </Stack.Group>
       ) : (

@@ -17,6 +17,7 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { createConversationId } from '../api/chatApi';
+import { syncAdventureReminder } from '../utils/adventureReminder';
 import { useAuthStore } from '../store';
 import { useChatStore } from '../store/chatStore';
 import { useSpeechStore } from '../store/speechStore';
@@ -49,13 +50,19 @@ function formatDate(date: Date | null) {
   }).format(date);
 }
 
-function ConversationRow({ item, onOpen, onDelete, onRename }: ConversationRowProps) {
+function ConversationRow({
+  item,
+  onOpen,
+  onDelete,
+  onRename,
+}: ConversationRowProps) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const translateX = useRef(new Animated.Value(0)).current;
   const isOpen = useRef(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [isDeleteConfirmationVisible, setDeleteConfirmationVisible] = useState(false);
+  const [isDeleteConfirmationVisible, setDeleteConfirmationVisible] =
+    useState(false);
   const panResponder = useMemo(
     () =>
       PanResponder.create({
@@ -113,7 +120,8 @@ function ConversationRow({ item, onOpen, onDelete, onRename }: ConversationRowPr
               styles.rowActionButton,
               styles.renameActionButton,
               pressed && styles.deleteButtonPressed,
-            ]}>
+            ]}
+          >
             <View style={styles.renameIconBackground}>
               <Text style={styles.renameActionText}>✎</Text>
             </View>
@@ -128,7 +136,8 @@ function ConversationRow({ item, onOpen, onDelete, onRename }: ConversationRowPr
               styles.rowActionButton,
               styles.deleteButton,
               pressed && styles.deleteButtonPressed,
-            ]}>
+            ]}
+          >
             {isDeleting ? (
               <ActivityIndicator color={colors.onAccent} size="small" />
             ) : (
@@ -151,13 +160,15 @@ function ConversationRow({ item, onOpen, onDelete, onRename }: ConversationRowPr
           style={[
             styles.conversationForeground,
             { transform: [{ translateX }] },
-          ]}>
+          ]}
+        >
           <View style={styles.conversationCard}>
             <Pressable
               accessibilityRole="button"
               accessibilityHint="Sola kaydırarak düzenleme ve silme seçeneklerini göster"
               onPress={() => onOpen(item)}
-              style={styles.conversationOpenButton}>
+              style={styles.conversationOpenButton}
+            >
               <View style={styles.conversationIcon}>
                 <Text style={styles.conversationIconText}>✦</Text>
               </View>
@@ -179,28 +190,35 @@ function ConversationRow({ item, onOpen, onDelete, onRename }: ConversationRowPr
         transparent
         visible={isDeleteConfirmationVisible}
         onRequestClose={() => setDeleteConfirmationVisible(false)}
-        statusBarTranslucent>
+        statusBarTranslucent
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Onayı kapat"
           onPress={() => setDeleteConfirmationVisible(false)}
-          style={styles.modalBackdrop}>
-          <Pressable style={styles.deleteConfirmation} onPress={() => { }}>
-            <Text style={styles.deleteConfirmationTitle}>Sohbet silinsin mi?</Text>
+          style={styles.modalBackdrop}
+        >
+          <Pressable style={styles.deleteConfirmation} onPress={() => {}}>
+            <Text style={styles.deleteConfirmationTitle}>
+              Sohbet silinsin mi?
+            </Text>
             <Text style={styles.deleteConfirmationMessage}>
-              “{item.title}” sohbeti ve içindeki tüm mesajlar kalıcı olarak silinecek.
+              “{item.title}” sohbeti ve içindeki tüm mesajlar kalıcı olarak
+              silinecek.
             </Text>
             <View style={styles.deleteConfirmationActions}>
               <Pressable
                 accessibilityRole="button"
                 onPress={() => setDeleteConfirmationVisible(false)}
-                style={styles.deleteCancelButton}>
+                style={styles.deleteCancelButton}
+              >
                 <Text style={styles.deleteCancelText}>Vazgeç</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
                 onPress={deleteConversation}
-                style={styles.deleteConfirmButton}>
+                style={styles.deleteConfirmButton}
+              >
                 <Text style={styles.deleteConfirmText}>Sohbeti sil</Text>
               </Pressable>
             </View>
@@ -218,8 +236,12 @@ export function HomeScreen({ navigation }: Props) {
   const logout = useAuthStore(state => state.logout);
   const isAuthLoading = useAuthStore(state => state.isLoading);
   const conversations = useChatStore(state => state.conversations);
-  const subscribeToConversations = useChatStore(state => state.subscribeToConversations);
-  const isLoadingConversations = useChatStore(state => state.isLoadingConversations);
+  const subscribeToConversations = useChatStore(
+    state => state.subscribeToConversations,
+  );
+  const isLoadingConversations = useChatStore(
+    state => state.isLoadingConversations,
+  );
   const error = useChatStore(state => state.error);
   const clearError = useChatStore(state => state.clearError);
   const deleteConversation = useChatStore(state => state.deleteConversation);
@@ -228,9 +250,11 @@ export function HomeScreen({ navigation }: Props) {
     state => state.status !== 'idle' || state.error !== null,
   );
   const [isProfileMenuVisible, setProfileMenuVisible] = useState(false);
-  const [isLogoutConfirmationVisible, setLogoutConfirmationVisible] = useState(false);
+  const [isLogoutConfirmationVisible, setLogoutConfirmationVisible] =
+    useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [conversationToRename, setConversationToRename] = useState<Conversation | null>(null);
+  const [conversationToRename, setConversationToRename] =
+    useState<Conversation | null>(null);
   const [renameTitle, setRenameTitle] = useState('');
   const [isRenaming, setIsRenaming] = useState(false);
 
@@ -241,6 +265,16 @@ export function HomeScreen({ navigation }: Props) {
 
     return subscribeToConversations(user.id);
   }, [subscribeToConversations, user?.id]);
+
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+
+    syncAdventureReminder(user.id).catch(reminderError => {
+      console.warn('Macera hatırlatıcısı geri yüklenemedi.', reminderError);
+    });
+  }, [user?.id]);
 
   const startConversation = () => {
     if (!user?.id) {
@@ -307,7 +341,11 @@ export function HomeScreen({ navigation }: Props) {
     }
 
     setIsRenaming(true);
-    const renamed = await renameConversation(user.id, conversationToRename.id, title);
+    const renamed = await renameConversation(
+      user.id,
+      conversationToRename.id,
+      title,
+    );
     setIsRenaming(false);
     if (renamed) {
       setConversationToRename(null);
@@ -317,7 +355,9 @@ export function HomeScreen({ navigation }: Props) {
   const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase('tr-TR');
   const visibleConversations = normalizedSearchQuery
     ? conversations.filter(conversation =>
-        conversation.title.toLocaleLowerCase('tr-TR').includes(normalizedSearchQuery),
+        conversation.title
+          .toLocaleLowerCase('tr-TR')
+          .includes(normalizedSearchQuery),
       )
     : conversations;
 
@@ -331,7 +371,10 @@ export function HomeScreen({ navigation }: Props) {
   );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={isPlayerVisible ? ['bottom'] : ['top', 'bottom']}>
+    <SafeAreaView
+      style={styles.safeArea}
+      edges={isPlayerVisible ? ['bottom'] : ['top', 'bottom']}
+    >
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <View style={styles.container}>
         <View style={styles.header}>
@@ -344,9 +387,13 @@ export function HomeScreen({ navigation }: Props) {
             accessibilityLabel="Profil ve uygulama seçenekleri"
             accessibilityState={{ expanded: isProfileMenuVisible }}
             onPress={() => setProfileMenuVisible(true)}
-            style={styles.profileButton}>
+            style={styles.profileButton}
+          >
             {user?.avatar ? (
-              <Image source={{ uri: user.avatar }} style={styles.profileImage} />
+              <Image
+                source={{ uri: user.avatar }}
+                style={styles.profileImage}
+              />
             ) : (
               <Text style={styles.profileInitial}>{profileInitial}</Text>
             )}
@@ -363,7 +410,8 @@ export function HomeScreen({ navigation }: Props) {
         <Pressable
           accessibilityRole="button"
           onPress={startConversation}
-          style={styles.newChatButton}>
+          style={styles.newChatButton}
+        >
           <Text style={styles.newChatIcon}>＋</Text>
           <View style={styles.newChatCopy}>
             <Text style={styles.newChatTitle}>Yeni sohbet</Text>
@@ -376,13 +424,34 @@ export function HomeScreen({ navigation }: Props) {
           accessibilityRole="button"
           accessibilityLabel="Mülakat simülasyonunu başlat"
           onPress={startInterview}
-          style={styles.interviewButton}>
+          style={styles.interviewButton}
+        >
           <View style={styles.interviewIcon}>
             <Text style={styles.interviewIconText}>⌁</Text>
           </View>
           <View style={styles.newChatCopy}>
             <Text style={styles.interviewTitle}>Mülakat simülasyonu</Text>
-            <Text style={styles.interviewSubtitle}>Soruları yanıtla, anlık geri bildirim al</Text>
+            <Text style={styles.interviewSubtitle}>
+              Soruları yanıtla, anlık geri bildirim al
+            </Text>
+          </View>
+          <Text style={styles.interviewArrow}>›</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Macera: Oda 307, başla veya devam et"
+          onPress={() => navigation.navigate('Adventure')}
+          style={styles.interviewButton}
+        >
+          <View style={styles.interviewIcon}>
+            <Text style={styles.interviewIconText}>✧</Text>
+          </View>
+          <View style={styles.newChatCopy}>
+            <Text style={styles.interviewTitle}>Macera · Oda 307</Text>
+            <Text style={styles.interviewSubtitle}>
+              Otel seni hatırlıyor. Hikâyene gir
+            </Text>
           </View>
           <Text style={styles.interviewArrow}>›</Text>
         </Pressable>
@@ -414,12 +483,16 @@ export function HomeScreen({ navigation }: Props) {
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>✧</Text>
             <Text style={styles.emptyTitle}>Henüz sohbet yok</Text>
-            <Text style={styles.emptyText}>İlk sohbetini başlatınca burada görünecek.</Text>
+            <Text style={styles.emptyText}>
+              İlk sohbetini başlatınca burada görünecek.
+            </Text>
           </View>
         ) : visibleConversations.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>Sonuç bulunamadı</Text>
-            <Text style={styles.emptyText}>Farklı bir sohbet adıyla tekrar ara.</Text>
+            <Text style={styles.emptyText}>
+              Farklı bir sohbet adıyla tekrar ara.
+            </Text>
           </View>
         ) : (
           <FlatList
@@ -436,14 +509,18 @@ export function HomeScreen({ navigation }: Props) {
         transparent
         visible={conversationToRename !== null}
         onRequestClose={() => setConversationToRename(null)}
-        statusBarTranslucent>
+        statusBarTranslucent
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Başlık düzenlemeyi kapat"
           onPress={() => setConversationToRename(null)}
-          style={styles.modalBackdrop}>
-          <Pressable style={styles.deleteConfirmation} onPress={() => { }}>
-            <Text style={styles.deleteConfirmationTitle}>Sohbet başlığını düzenle</Text>
+          style={styles.modalBackdrop}
+        >
+          <Pressable style={styles.deleteConfirmation} onPress={() => {}}>
+            <Text style={styles.deleteConfirmationTitle}>
+              Sohbet başlığını düzenle
+            </Text>
             <TextInput
               value={renameTitle}
               onChangeText={setRenameTitle}
@@ -459,14 +536,16 @@ export function HomeScreen({ navigation }: Props) {
                 accessibilityRole="button"
                 onPress={() => setConversationToRename(null)}
                 disabled={isRenaming}
-                style={styles.deleteCancelButton}>
+                style={styles.deleteCancelButton}
+              >
                 <Text style={styles.deleteCancelText}>Vazgeç</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
                 onPress={saveConversationTitle}
                 disabled={isRenaming || !renameTitle.trim()}
-                style={styles.deleteConfirmButton}>
+                style={styles.deleteConfirmButton}
+              >
                 <Text style={styles.deleteConfirmText}>
                   {isRenaming ? 'Kaydediliyor...' : 'Kaydet'}
                 </Text>
@@ -480,19 +559,26 @@ export function HomeScreen({ navigation }: Props) {
         transparent
         visible={isProfileMenuVisible}
         onRequestClose={() => setProfileMenuVisible(false)}
-        statusBarTranslucent>
+        statusBarTranslucent
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Menüyü kapat"
           onPress={() => setProfileMenuVisible(false)}
-          style={styles.modalBackdrop}>
-          <Pressable style={styles.profileMenu} onPress={() => { }}>
+          style={styles.modalBackdrop}
+        >
+          <Pressable style={styles.profileMenu} onPress={() => {}}>
             <View style={styles.profileMenuHeader}>
               <View style={styles.profileMenuAvatar}>
                 {user?.avatar ? (
-                  <Image source={{ uri: user.avatar }} style={styles.profileMenuAvatarImage} />
+                  <Image
+                    source={{ uri: user.avatar }}
+                    style={styles.profileMenuAvatarImage}
+                  />
                 ) : (
-                  <Text style={styles.profileMenuAvatarText}>{profileInitial}</Text>
+                  <Text style={styles.profileMenuAvatarText}>
+                    {profileInitial}
+                  </Text>
                 )}
               </View>
               <View style={styles.profileDetails}>
@@ -511,7 +597,8 @@ export function HomeScreen({ navigation }: Props) {
                 accessibilityRole="button"
                 accessibilityLabel="Menüyü kapat"
                 onPress={() => setProfileMenuVisible(false)}
-                style={styles.closeButton}>
+                style={styles.closeButton}
+              >
                 <Text style={styles.closeButtonText}>×</Text>
               </Pressable>
             </View>
@@ -522,7 +609,8 @@ export function HomeScreen({ navigation }: Props) {
               accessibilityRole="button"
               onPress={requestLogout}
               disabled={isAuthLoading}
-              style={styles.menuLogoutButton}>
+              style={styles.menuLogoutButton}
+            >
               <Text style={styles.menuLogoutText}>
                 {isAuthLoading ? 'Çıkış yapılıyor...' : 'Çıkış yap'}
               </Text>
@@ -535,14 +623,18 @@ export function HomeScreen({ navigation }: Props) {
         transparent
         visible={isLogoutConfirmationVisible}
         onRequestClose={() => setLogoutConfirmationVisible(false)}
-        statusBarTranslucent>
+        statusBarTranslucent
+      >
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Onayı kapat"
           onPress={() => setLogoutConfirmationVisible(false)}
-          style={styles.modalBackdrop}>
-          <Pressable style={styles.deleteConfirmation} onPress={() => { }}>
-            <Text style={styles.deleteConfirmationTitle}>Çıkış yapılsın mı?</Text>
+          style={styles.modalBackdrop}
+        >
+          <Pressable style={styles.deleteConfirmation} onPress={() => {}}>
+            <Text style={styles.deleteConfirmationTitle}>
+              Çıkış yapılsın mı?
+            </Text>
             <Text style={styles.deleteConfirmationMessage}>
               Hesabınızdan çıkış yapmak istediğinize emin misiniz?
             </Text>
@@ -550,14 +642,16 @@ export function HomeScreen({ navigation }: Props) {
               <Pressable
                 accessibilityRole="button"
                 onPress={() => setLogoutConfirmationVisible(false)}
-                style={styles.deleteCancelButton}>
+                style={styles.deleteCancelButton}
+              >
                 <Text style={styles.deleteCancelText}>Vazgeç</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
                 onPress={handleLogout}
                 disabled={isAuthLoading}
-                style={styles.deleteConfirmButton}>
+                style={styles.deleteConfirmButton}
+              >
                 <Text style={styles.deleteConfirmText}>
                   {isAuthLoading ? 'Çıkış yapılıyor...' : 'Çıkış yap'}
                 </Text>
@@ -573,15 +667,25 @@ export function HomeScreen({ navigation }: Props) {
 function createStyles(colors: AppTheme['colors']) {
   return StyleSheet.create({
     safeArea: { flex: 1, backgroundColor: colors.background },
-    container: { flex: 1, paddingHorizontal: 22, paddingTop: 14 },
+    container: { flex: 1, paddingHorizontal: 16, paddingTop: 14 },
     header: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
       marginBottom: 26,
     },
-    eyebrow: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 2 },
-    title: { color: colors.text, fontSize: 28, fontWeight: '800', marginTop: 4 },
+    eyebrow: {
+      color: colors.accent,
+      fontSize: 11,
+      fontWeight: '800',
+      letterSpacing: 2,
+    },
+    title: {
+      color: colors.text,
+      fontSize: 28,
+      fontWeight: '800',
+      marginTop: 4,
+    },
     profileButton: {
       width: 44,
       height: 44,
@@ -593,7 +697,13 @@ function createStyles(colors: AppTheme['colors']) {
     profileInitial: { color: colors.accent, fontSize: 17, fontWeight: '700' },
     profileImage: { width: 40, height: 40, borderRadius: 20 },
     greeting: { color: colors.text, fontSize: 19, fontWeight: '700' },
-    description: { color: colors.textSecondary, fontSize: 14, lineHeight: 21, marginTop: 7, marginBottom: 20 },
+    description: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      lineHeight: 21,
+      marginTop: 7,
+      marginBottom: 20,
+    },
     newChatButton: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -606,7 +716,12 @@ function createStyles(colors: AppTheme['colors']) {
       shadowRadius: 16,
       elevation: 6,
     },
-    newChatIcon: { color: '#FFFFFF', fontSize: 28, fontWeight: '300', marginRight: 13 },
+    newChatIcon: {
+      color: '#FFFFFF',
+      fontSize: 28,
+      fontWeight: '300',
+      marginRight: 13,
+    },
     newChatCopy: { flex: 1 },
     newChatTitle: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
     newChatSubtitle: { color: '#E0D9FF', fontSize: 12, marginTop: 4 },
@@ -630,10 +745,22 @@ function createStyles(colors: AppTheme['colors']) {
       justifyContent: 'center',
       marginRight: 12,
     },
-    interviewIconText: { color: colors.accent, fontSize: 22, fontWeight: '700' },
+    interviewIconText: {
+      color: colors.accent,
+      fontSize: 22,
+      fontWeight: '700',
+    },
     interviewTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
-    interviewSubtitle: { color: colors.textSecondary, fontSize: 12, marginTop: 3 },
-    interviewArrow: { color: colors.textMuted, fontSize: 25, fontWeight: '300' },
+    interviewSubtitle: {
+      color: colors.textSecondary,
+      fontSize: 12,
+      marginTop: 3,
+    },
+    interviewArrow: {
+      color: colors.textMuted,
+      fontSize: 25,
+      fontWeight: '300',
+    },
     listHeader: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -779,10 +906,19 @@ function createStyles(colors: AppTheme['colors']) {
     conversationMeta: { color: colors.textMuted, fontSize: 12, marginTop: 5 },
     chevron: { color: colors.textMuted, fontSize: 24, marginLeft: 10 },
     centered: { padding: 32, alignItems: 'center' },
-    emptyState: { alignItems: 'center', paddingVertical: 35, paddingHorizontal: 20 },
+    emptyState: {
+      alignItems: 'center',
+      paddingVertical: 35,
+      paddingHorizontal: 20,
+    },
     emptyIcon: { color: colors.accent, fontSize: 34, marginBottom: 10 },
     emptyTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
-    emptyText: { color: colors.textSecondary, fontSize: 13, textAlign: 'center', marginTop: 6 },
+    emptyText: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      textAlign: 'center',
+      marginTop: 6,
+    },
     error: { color: colors.error, fontSize: 13, marginBottom: 8 },
     modalBackdrop: {
       flex: 1,
@@ -845,7 +981,11 @@ function createStyles(colors: AppTheme['colors']) {
       borderRadius: 13,
       backgroundColor: colors.surfaceRaised,
     },
-    deleteCancelText: { color: colors.textSecondary, fontSize: 14, fontWeight: '600' },
+    deleteCancelText: {
+      color: colors.textSecondary,
+      fontSize: 14,
+      fontWeight: '600',
+    },
     deleteConfirmButton: {
       alignItems: 'center',
       justifyContent: 'center',
@@ -866,7 +1006,11 @@ function createStyles(colors: AppTheme['colors']) {
       overflow: 'hidden',
     },
     profileMenuAvatarImage: { width: 48, height: 48 },
-    profileMenuAvatarText: { color: colors.accent, fontSize: 18, fontWeight: '700' },
+    profileMenuAvatarText: {
+      color: colors.accent,
+      fontSize: 18,
+      fontWeight: '700',
+    },
     profileDetails: { flex: 1, marginLeft: 12 },
     profileName: { color: colors.text, fontSize: 15, fontWeight: '700' },
     profileEmail: { color: colors.textMuted, fontSize: 12, marginTop: 3 },
@@ -878,8 +1022,16 @@ function createStyles(colors: AppTheme['colors']) {
       borderRadius: 16,
       backgroundColor: colors.surfaceRaised,
     },
-    closeButtonText: { color: colors.textSecondary, fontSize: 24, lineHeight: 27 },
-    menuDivider: { height: 1, backgroundColor: colors.border, marginVertical: 18 },
+    closeButtonText: {
+      color: colors.textSecondary,
+      fontSize: 24,
+      lineHeight: 27,
+    },
+    menuDivider: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginVertical: 18,
+    },
     menuSectionTitle: {
       color: colors.textSecondary,
       fontSize: 13,
