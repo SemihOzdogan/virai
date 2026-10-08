@@ -1,5 +1,5 @@
 import React, { useId } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import Svg, {
   Circle,
   Defs,
@@ -11,8 +11,9 @@ import Svg, {
   Stop,
   Text as SvgText,
 } from 'react-native-svg';
-import { sceneIllustration, type Scene, type IllustrationName } from './story';
-import { useTheme } from '../theme/ThemeProvider';
+import { sceneIllustration, type Scene, type IllustrationName } from '../services/story';
+import { useTheme } from '../../../theme';
+import { styles } from './SceneIllustration.styles';
 
 const captions: Record<IllustrationName, string> = {
   lobby: 'Atlas Oteli · Gece yarısı resepsiyonu',
@@ -313,7 +314,7 @@ export function SceneIllustration({ scene }: { scene: Scene }) {
       accessibilityLabel={captions[kind]}
     >
       <Svg
-        style={StyleSheet.absoluteFill}
+        style={styles.artwork}
         width="100%"
         height="100%"
         viewBox="0 0 360 220"
@@ -345,23 +346,3 @@ export function SceneIllustration({ scene }: { scene: Scene }) {
     </View>
   );
 }
-const styles = StyleSheet.create({
-  frame: {
-    width: '100%',
-    alignSelf: 'stretch',
-    aspectRatio: 360 / 220,
-    marginTop: 18,
-    marginBottom: 8,
-    borderRadius: 20,
-    overflow: 'hidden',
-  },
-  caption: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    fontSize: 11,
-  },
-});

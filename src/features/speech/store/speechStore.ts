@@ -4,7 +4,7 @@ import {
   endSpeechLiveActivity,
   startSpeechLiveActivity,
   updateSpeechLiveActivity,
-} from '../utils/liveActivity';
+} from '../services/liveActivity';
 
 type SpeechStatus = 'idle' | 'playing' | 'paused';
 type TtsEventName = 'tts-finish' | 'tts-pause' | 'tts-resume' | 'tts-cancel';

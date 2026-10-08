@@ -1,4 +1,7 @@
-import { AUTH_SESSION_DURATION_MS, getAuthSessionExpiresAt } from '../src/utils/authSession';
+import {
+  AUTH_SESSION_DURATION_MS,
+  getAuthSessionExpiresAt,
+} from '../src/features/auth/services/authSession';
 
 describe('getAuthSessionExpiresAt', () => {
   it('sets the session expiry to seven days after the last sign-in', () => {

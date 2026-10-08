@@ -5,16 +5,17 @@ import {
   DefaultTheme,
   NavigationContainer,
 } from '@react-navigation/native';
-import { Linking, StyleSheet, View } from 'react-native';
+import { Linking, View } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import notifee, { EventType } from '@notifee/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { SpeechPlayer } from './src/components/SpeechPlayer';
+import { SpeechPlayer } from './src/features/speech/components/SpeechPlayer';
 import { AppNavigator } from './src/navigation/AppNavigator';
-import { useSpeechStore } from './src/store/speechStore';
-import { ThemeProvider, useTheme } from './src/theme/ThemeProvider';
-import { useAuthStore } from './src/store';
+import { useSpeechStore } from './src/features/speech/store/speechStore';
+import { ThemeProvider, useTheme } from './src/theme';
+import { styles } from './src/App.styles';
+import { useAuthStore } from './src/features/auth/store/authStore';
 import type { RootStackParamList } from './src/types/navigation';
 
 const navigationRef = createNavigationContainerRef<RootStackParamList>();
@@ -142,8 +143,3 @@ function ThemedNavigation() {
     </NavigationContainer>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { flex: 1 },
-  navigator: { flex: 1 },
-});

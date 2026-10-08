@@ -1,14 +1,15 @@
 import React, { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { createStackNavigator } from '@react-navigation/stack';
 
-import { LoginScreen } from '../screens/LoginScreen';
-import { RegisterScreen } from '../screens/RegisterScreen';
-import { HomeScreen } from '../screens/HomeScreen';
-import { AdventureScreen } from '../screens/AdventureScreen';
-import { ChatScreen } from '../screens/ChatScreen';
-import { useAuthStore } from '../store';
-import { useTheme } from '../theme/ThemeProvider';
+import { LoginScreen } from '../features/auth/screens/LoginScreen/LoginScreen';
+import { RegisterScreen } from '../features/auth/screens/RegisterScreen/RegisterScreen';
+import { HomeScreen } from '../features/chat/screens/HomeScreen/HomeScreen';
+import { AdventureScreen } from '../features/adventure/screens/AdventureScreen/AdventureScreen';
+import { ChatScreen } from '../features/chat/screens/ChatScreen/ChatScreen';
+import { useAuthStore } from '../features/auth/store/authStore';
+import { useTheme } from '../theme';
+import { styles } from './AppNavigator.styles';
 import type { RootStackParamList } from '../types/navigation';
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -51,7 +52,3 @@ export function AppNavigator() {
     </Stack.Navigator>
   );
 }
-
-const styles = StyleSheet.create({
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-});

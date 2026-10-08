@@ -9,7 +9,6 @@ import {
   Pressable,
   ScrollView,
   StatusBar,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -17,12 +16,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
 
-import { useAuthStore } from '../store';
-import { useChatStore } from '../store/chatStore';
-import { useSpeechStore } from '../store/speechStore';
-import { useTheme, type AppTheme } from '../theme/ThemeProvider';
-import type { ChatMessage } from '../types/chat';
-import type { RootStackParamList } from '../types/navigation';
+import { useAuthStore } from '../../../auth/store/authStore';
+import { useChatStore } from '../../store/chatStore';
+import { useSpeechStore } from '../../../speech/store/speechStore';
+import { useTheme } from '../../../../theme';
+import { animationStyles, createStyles } from './ChatScreen.styles';
+import type { ChatMessage } from '../../types/chat';
+import type { RootStackParamList } from '../../../../types/navigation';
 
 type Props = StackScreenProps<RootStackParamList, 'Chat'>;
 type SpeechRecognitionApi = typeof import('react-native-speech-recognition-kit');
@@ -581,174 +581,3 @@ export function ChatScreen({ navigation, route }: Props) {
     </SafeAreaView>
   );
 }
-
-function createStyles(colors: AppTheme['colors']) {
-  return StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: colors.background },
-  container: { flex: 1, backgroundColor: colors.background },
-  header: {
-    minHeight: 62,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 18,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 13,
-    backgroundColor: colors.surfaceRaised,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backText: { color: colors.text, fontSize: 31, lineHeight: 33, marginTop: -3 },
-  headerTitleWrap: { flex: 1, marginLeft: 12 },
-  headerTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
-  headerSubtitle: { color: colors.textMuted, fontSize: 11, marginTop: 3 },
-  headerMark: {
-    width: 36,
-    height: 36,
-    borderRadius: 13,
-    backgroundColor: colors.accentSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerMarkText: { color: colors.accent, fontSize: 20 },
-  messages: { flex: 1 },
-  messagesContent: { flexGrow: 1, paddingHorizontal: 16, paddingBottom: 20 },
-  loading: { padding: 28, alignItems: 'center' },
-  welcome: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 },
-  welcomeMark: {
-    width: 62,
-    height: 62,
-    borderRadius: 22,
-    backgroundColor: colors.accentSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 18,
-  },
-  welcomeMarkText: { color: colors.accent, fontSize: 32 },
-  welcomeTitle: { color: colors.text, fontSize: 20, fontWeight: '700', textAlign: 'center' },
-  welcomeText: {
-    color: colors.textSecondary,
-    fontSize: 14,
-    lineHeight: 22,
-    textAlign: 'center',
-    marginTop: 10,
-    maxWidth: 300,
-  },
-  starterPrompts: {
-    width: '100%',
-    gap: 8,
-    marginTop: 22,
-  },
-  starterPrompt: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 14,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 14,
-    paddingVertical: 11,
-  },
-  starterPromptText: { color: colors.textSecondary, fontSize: 13, textAlign: 'center' },
-  messageRow: { flexDirection: 'row', alignItems: 'flex-end', marginVertical: 8 },
-  userMessageRow: { justifyContent: 'flex-end' },
-  assistantMark: {
-    width: 27,
-    height: 27,
-    borderRadius: 10,
-    backgroundColor: colors.accentSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 8,
-    marginBottom: 2,
-  },
-  assistantMarkText: { color: colors.accent, fontSize: 15 },
-  messageBubble: { maxWidth: '100%', paddingHorizontal: 15, paddingVertical: 12, borderRadius: 19 },
-  messageContent: { maxWidth: '84%', alignItems: 'flex-start' },
-  userMessageContent: { alignItems: 'flex-end' },
-  userBubble: { backgroundColor: colors.userBubble, borderBottomRightRadius: 6 },
-  assistantBubble: {
-    backgroundColor: colors.assistantBubble,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderBottomLeftRadius: 6,
-  },
-  failedBubble: { borderColor: 'rgba(255,138,138,0.5)' },
-  messageText: { color: colors.text, fontSize: 15, lineHeight: 22 },
-  userMessageText: { color: colors.onAccent },
-  messageTime: { color: colors.textMuted, fontSize: 10, marginTop: 4, marginHorizontal: 5 },
-  failedLabel: { color: colors.error, fontSize: 11, marginTop: 6 },
-  retryButton: { alignSelf: 'flex-start', marginTop: 9, paddingVertical: 3 },
-  retryButtonText: { color: colors.accent, fontSize: 12, fontWeight: '700' },
-  speechButton: { alignSelf: 'flex-start', marginTop: 10, paddingVertical: 3 },
-  speechButtonText: { color: colors.accent, fontSize: 12, fontWeight: '700' },
-  typingRow: { flexDirection: 'row', alignItems: 'center', marginTop: 8 },
-  typingBubble: {
-    minWidth: 62,
-    height: 42,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.assistantBubble,
-    borderRadius: 16,
-    paddingHorizontal: 13,
-    paddingVertical: 10,
-  },
-  error: { color: colors.error, fontSize: 12, paddingHorizontal: 18, paddingBottom: 7 },
-  voiceNotice: {
-    color: colors.textSecondary,
-    fontSize: 12,
-    paddingHorizontal: 18,
-    paddingBottom: 7,
-  },
-  composer: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    marginHorizontal: 13,
-    padding: 8,
-    paddingLeft: 15,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-  },
-  input: {
-    flex: 1,
-    color: colors.text,
-    fontSize: 15,
-    lineHeight: 21,
-    maxHeight: 125,
-    paddingTop: 9,
-    paddingBottom: 8,
-  },
-  sendButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 14,
-    backgroundColor: colors.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 8,
-  },
-  sendButtonDisabled: { opacity: 0.4 },
-  voiceButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 14,
-    backgroundColor: colors.surfaceRaised,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 6,
-  },
-  voiceButtonActive: { backgroundColor: colors.error },
-  voiceButtonText: { color: colors.textSecondary, fontSize: 16, fontWeight: '700' },
-  sendButtonText: { color: '#FFFFFF', fontSize: 25, fontWeight: '700', lineHeight: 30 },
-  footerNote: { color: colors.textMuted, fontSize: 10, textAlign: 'center', paddingVertical: 7 },
-  });
-}
-
-const animationStyles = StyleSheet.create({
-  typingDots: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  typingDot: { width: 7, height: 7, borderRadius: 4 },
-});

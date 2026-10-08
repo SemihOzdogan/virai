@@ -5,7 +5,7 @@
 import React from 'react';
 import ReactTestRenderer from 'react-test-renderer';
 
-jest.mock('../src/api/authApi', () => ({
+jest.mock('../src/features/auth/api/authApi', () => ({
   loginWithEmailAndPassword: jest.fn(),
   loginWithGoogle: jest.fn(),
   logoutFromFirebase: jest.fn(),
@@ -39,7 +39,7 @@ jest.mock('@iternio/react-native-tts', () => ({
   },
 }));
 
-jest.mock('../src/api/chatApi', () => ({
+jest.mock('../src/features/chat/api/chatApi', () => ({
   createConversationId: jest.fn(),
   sendChatMessage: jest.fn(),
   subscribeToConversations: jest.fn(() => jest.fn()),

@@ -1,4 +1,4 @@
-import type { ChatMode } from './chat';
+import type { ChatMode } from '../features/chat/types/chat';
 
 export type RootStackParamList = {
   Login: undefined;

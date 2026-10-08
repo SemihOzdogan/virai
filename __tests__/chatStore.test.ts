@@ -1,4 +1,4 @@
-jest.mock('../src/api/chatApi', () => ({
+jest.mock('../src/features/chat/api/chatApi', () => ({
   deleteChatConversation: jest.fn(),
   renameChatConversation: jest.fn(),
   sendChatMessage: jest.fn(),
@@ -6,8 +6,8 @@ jest.mock('../src/api/chatApi', () => ({
   subscribeToMessages: jest.fn(),
 }));
 
-import { sendChatMessage } from '../src/api/chatApi';
-import { useChatStore } from '../src/store/chatStore';
+import { sendChatMessage } from '../src/features/chat/api/chatApi';
+import { useChatStore } from '../src/features/chat/store/chatStore';
 
 test('tracks pending replies independently for each conversation', async () => {
   let resolveFirst: (() => void) | undefined;

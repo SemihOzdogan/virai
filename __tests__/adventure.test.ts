@@ -4,7 +4,7 @@ import {
   restoreAdventure,
   totalTurns,
   sceneIllustration,
-} from '../src/adventure/story';
+} from '../src/features/adventure/services/story';
 
 const scene = {
   text: 'Kapı açıldı.',

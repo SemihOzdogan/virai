@@ -3,7 +3,7 @@ import {
   cancelAdventureReminder,
   scheduleAdventureReminder,
   syncAdventureReminder,
-} from '../src/utils/adventureReminder';
+} from '../src/features/adventure/services/adventureReminder';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   __esModule: true,

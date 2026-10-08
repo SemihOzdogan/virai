@@ -1,9 +1,10 @@
 import React, { useMemo } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useSpeechStore } from '../store/speechStore';
-import { useTheme } from '../theme/ThemeProvider';
+import { useTheme } from '../../../theme';
+import { createStyles } from './SpeechPlayer.styles';
 
 export function SpeechPlayer() {
   const { colors } = useTheme();
@@ -51,49 +52,4 @@ export function SpeechPlayer() {
       </View>
     </SafeAreaView>
   );
-}
-
-function createStyles(colors: ReturnType<typeof useTheme>['colors']) {
-  return StyleSheet.create({
-    safeArea: {
-      backgroundColor: colors.surface,
-      borderBottomColor: colors.border,
-      borderBottomWidth: StyleSheet.hairlineWidth,
-      zIndex: 2,
-    },
-    player: {
-      minHeight: 58,
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-    },
-    description: {
-      flex: 1,
-    },
-    title: {
-      color: colors.text,
-      fontSize: 13,
-      fontWeight: '700',
-    },
-    subtitle: {
-      color: colors.textSecondary,
-      fontSize: 12,
-      marginTop: 2,
-    },
-    control: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      backgroundColor: colors.accentSoft,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    controlText: {
-      color: colors.accent,
-      fontSize: 16,
-      fontWeight: '700',
-    },
-  });
 }

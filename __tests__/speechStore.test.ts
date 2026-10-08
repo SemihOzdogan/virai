@@ -12,7 +12,7 @@ jest.mock('@iternio/react-native-tts', () => ({
   },
 }));
 
-import { useSpeechStore } from '../src/store/speechStore';
+import { useSpeechStore } from '../src/features/speech/store/speechStore';
 
 test('keeps playback controls available independently of a chat screen', async () => {
   await useSpeechStore.getState().play('Yanıt metni', 'message-1', 'conversation-1', 'Sohbet');

@@ -19,8 +19,8 @@ import {
   getFirebaseAuth,
   getGoogleOAuthClientIds,
   isFirebaseConfigured,
-} from '../config/firebase';
-import { getAuthSessionExpiresAt } from '../utils/authSession';
+} from '../../../config/firebase';
+import { getAuthSessionExpiresAt } from '../services/authSession';
 import type {
   AppUser,
   LoginCredentials,

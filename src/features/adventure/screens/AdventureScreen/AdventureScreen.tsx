@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { SceneIllustration } from '../adventure/SceneIllustration';
+import { SceneIllustration } from '../../components/SceneIllustration';
 import {
   cancelAdventureReminder,
   scheduleAdventureReminder,
-} from '../utils/adventureReminder';
+} from '../../services/adventureReminder';
 import {
   ActivityIndicator,
   Alert,
@@ -12,7 +12,6 @@ import {
   Pressable,
   ScrollView,
   Share,
-  StyleSheet,
   Text,
   TextInput,
   View,
@@ -20,9 +19,10 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
-import type { RootStackParamList } from '../types/navigation';
-import { useAuthStore } from '../store/authStore';
-import { useTheme, type AppTheme } from '../theme/ThemeProvider';
+import type { RootStackParamList } from '../../../../types/navigation';
+import { useAuthStore } from '../../../auth/store/authStore';
+import { useTheme, type AppTheme } from '../../../../theme';
+import { createStyles } from './AdventureScreen.styles';
 import {
   chapters,
   characters,
@@ -31,7 +31,7 @@ import {
   restoreAdventure,
   totalTurns,
   type Adventure,
-} from '../adventure/story';
+} from '../../services/story';
 
 type Props = StackScreenProps<RootStackParamList, 'Adventure'>;
 export function AdventureScreen({ navigation }: Props) {
@@ -129,7 +129,7 @@ function AdventureGame({
     setError(null);
     let stage: 'generate' | 'save' = 'generate';
     try {
-      const { narrate } = await import('../adventure/narrator');
+      const { narrate } = await import('../../services/narrator');
       const scene = await narrate(adventure, action);
       const next: Adventure = {
         version: 1,
@@ -223,11 +223,10 @@ function AdventureGame({
         <View style={styles.header}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Geri dön"
+            accessibilityLabel="Geri"
             onPress={onBack}
-            style={styles.back}
-          >
-            <Text style={styles.text}>‹ Geri</Text>
+            style={styles.backButton}>
+            <Text style={styles.backText}>‹</Text>
           </Pressable>
           <Text style={styles.label}>MACERA</Text>
           <Text style={styles.muted}>
@@ -398,108 +397,3 @@ function AdventureGame({
     </SafeAreaView>
   );
 }
-const createStyles = (colors: AppTheme['colors']) =>
-  StyleSheet.create({
-    root: { flex: 1, backgroundColor: colors.background },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 20,
-      paddingVertical: 10,
-    },
-    back: { paddingVertical: 14 },
-    content: { padding: 22, paddingBottom: 40 },
-    hero: {
-      padding: 24,
-      backgroundColor: colors.accentSoft,
-      borderRadius: 24,
-      marginBottom: 24,
-    },
-    label: {
-      color: colors.accent,
-      fontSize: 11,
-      fontWeight: '800',
-      letterSpacing: 2,
-    },
-    title: {
-      color: colors.text,
-      fontSize: 42,
-      fontWeight: '800',
-      marginVertical: 12,
-    },
-    subtitle: { color: colors.textSecondary, fontSize: 16, lineHeight: 24 },
-    progress: { flexDirection: 'row', gap: 6, marginVertical: 20 },
-    segment: { flex: 1, height: 5, borderRadius: 3 },
-    text: { color: colors.text, fontSize: 15, lineHeight: 23 },
-    muted: { color: colors.textSecondary, fontSize: 12, lineHeight: 20 },
-    section: {
-      color: colors.text,
-      fontSize: 17,
-      fontWeight: '700',
-      marginBottom: 12,
-    },
-    story: {
-      color: colors.text,
-      fontSize: 17,
-      lineHeight: 29,
-      marginVertical: 18,
-    },
-    action: {
-      color: colors.accent,
-      backgroundColor: colors.accentSoft,
-      padding: 16,
-      borderRadius: 16,
-      fontSize: 15,
-      lineHeight: 23,
-    },
-    reward: {
-      color: colors.accent,
-      fontSize: 13,
-      lineHeight: 22,
-      marginBottom: 20,
-    },
-    collection: {
-      padding: 18,
-      borderRadius: 16,
-      backgroundColor: colors.surfaceRaised,
-      marginBottom: 24,
-    },
-    choice: {
-      padding: 17,
-      borderRadius: 16,
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surface,
-      marginBottom: 10,
-    },
-    input: {
-      color: colors.text,
-      backgroundColor: colors.input,
-      borderRadius: 16,
-      padding: 16,
-      minHeight: 80,
-      marginVertical: 12,
-      textAlignVertical: 'top',
-    },
-    primary: {
-      backgroundColor: colors.accent,
-      padding: 17,
-      borderRadius: 16,
-      alignItems: 'center',
-    },
-    primaryText: { color: colors.onAccent, fontWeight: '700', fontSize: 15 },
-    disabled: { opacity: 0.45 },
-    wait: {
-      flexDirection: 'row',
-      gap: 10,
-      justifyContent: 'center',
-      padding: 20,
-    },
-    error: {
-      color: colors.error,
-      fontSize: 14,
-      lineHeight: 22,
-      paddingVertical: 12,
-    },
-  });

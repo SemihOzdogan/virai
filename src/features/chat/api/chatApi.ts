@@ -17,7 +17,7 @@ import {
   writeBatch,
 } from '@firebase/firestore';
 
-import { getFirebaseApp } from '../config/firebase';
+import { getFirebaseApp } from '../../../config/firebase';
 import type { ChatMessage, ChatMode, Conversation } from '../types/chat';
 
 const firestore = () => getFirestore(getFirebaseApp());

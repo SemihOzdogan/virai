@@ -1,7 +1,8 @@
 import React from 'react';
-import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, Text, View } from 'react-native';
 
-import { useTheme, type ThemeMode } from './ThemeProvider';
+import { useTheme, type ThemeMode } from './';
+import { styles } from './ThemeSelector.styles';
 
 const options: { mode: ThemeMode; label: string }[] = [
   { mode: 'system', label: 'Sistem' },
@@ -47,24 +48,3 @@ export function ThemeSelector() {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    gap: 3,
-    padding: 3,
-    borderRadius: 14,
-  },
-  option: {
-    minWidth: 58,
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 11,
-  },
-  label: {
-    fontSize: 12,
-    fontWeight: '600',
-  },
-});

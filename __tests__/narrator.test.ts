@@ -12,7 +12,7 @@ jest.mock('@react-native-firebase/ai', () => ({
     enumString: (v: unknown) => v,
   },
 }));
-import { narrate } from '../src/adventure/narrator';
+import { narrate } from '../src/features/adventure/services/narrator';
 const valid = {
   text: 'Kapı açılıyor.',
   choices: ['Gir', 'Bekle', 'Seslen'],

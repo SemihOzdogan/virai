@@ -5,7 +5,7 @@ import notifee, {
   TriggerType,
 } from '@notifee/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { restoreAdventure, totalTurns } from '../adventure/story';
+import { restoreAdventure, totalTurns } from './story';
 
 const channelId = 'adventure-reminders';
 const reminderHour = 12;
