@@ -3,6 +3,7 @@ import { SceneIllustration } from '../../components/SceneIllustration';
 import {
   cancelAdventureReminder,
   scheduleAdventureReminder,
+  sendAdventureReminderTest,
 } from '../../services/adventureReminder';
 import {
   ActivityIndicator,
@@ -64,6 +65,7 @@ function AdventureGame({
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [isSendingTestNotification, setSendingTestNotification] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const lock = useRef(false);
   const alive = useRef(true);
@@ -201,6 +203,22 @@ function AdventureGame({
         },
       ],
     );
+  const sendTestNotification = async () => {
+    setSendingTestNotification(true);
+    try {
+      const sent = await sendAdventureReminderTest();
+      Alert.alert(
+        t(sent ? 'testNotificationSentTitle' : 'testNotificationBlockedTitle'),
+        t(sent ? 'testNotificationSentMessage' : 'testNotificationBlockedMessage'),
+      );
+    } catch {
+      Alert.alert(t('testNotificationErrorTitle'), t('testNotificationErrorMessage'));
+    } finally {
+      if (alive.current) {
+        setSendingTestNotification(false);
+      }
+    }
+  };
   const count = adventure?.turns.length ?? 0;
   const complete = count === totalTurns;
   const chapter = Math.min(4, Math.floor(count / 3));
@@ -269,6 +287,22 @@ function AdventureGame({
               <Text style={styles.muted}>
                 {t('adventureAutoSave')}
               </Text>
+              {/* <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('sendTestNotification')}
+                disabled={isSendingTestNotification}
+                onPress={sendTestNotification}
+                style={[
+                  styles.testNotificationButton,
+                  isSendingTestNotification && styles.disabled,
+                ]}
+              >
+                <Text style={styles.testNotificationText}>
+                  {isSendingTestNotification
+                    ? t('sendingTestNotification')
+                    : t('sendTestNotification')}
+                </Text>
+              </Pressable> /* Notification Test Button  */}
             </View>
             {adventure && (
               <>

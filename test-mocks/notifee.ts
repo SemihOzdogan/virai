@@ -3,6 +3,7 @@ const notifee = {
   createChannel: jest.fn(async () => 'adventure-reminders'),
   cancelTriggerNotification: jest.fn(async () => undefined),
   createTriggerNotification: jest.fn(async () => 'adventure-reminder'),
+  displayNotification: jest.fn(async () => 'adventure-reminder-test'),
   getInitialNotification: jest.fn(async () => null),
   onForegroundEvent: jest.fn(() => jest.fn()),
   onBackgroundEvent: jest.fn(),
