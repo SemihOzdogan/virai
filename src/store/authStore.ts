@@ -7,8 +7,14 @@ import {
   observeFirebaseAuth,
   registerWithEmailAndPassword,
   sendPasswordReset,
+  updateUserProfile,
 } from '../api/authApi';
-import type { AppUser, LoginCredentials, RegisterCredentials } from '../types/user';
+import type {
+  AppUser,
+  LoginCredentials,
+  RegisterCredentials,
+  UpdateProfileCredentials,
+} from '../types/user';
 
 type AuthState = {
   user: AppUser | null;
@@ -23,6 +29,7 @@ type AuthState = {
   register: (credentials: RegisterCredentials) => Promise<boolean>;
   loginWithGoogle: () => Promise<boolean>;
   requestPasswordReset: (email: string) => Promise<boolean>;
+  updateProfile: (credentials: UpdateProfileCredentials) => Promise<boolean>;
   logout: () => Promise<boolean>;
   clearError: () => void;
 };
@@ -132,6 +139,22 @@ export const useAuthStore = create<AuthState>((set) => ({
         isLoading: false,
         error:
           error instanceof Error ? error.message : 'Şifre sıfırlama isteği gönderilemedi.',
+      });
+      return false;
+    }
+  },
+  updateProfile: async credentials => {
+    set({ isLoading: true, error: null });
+
+    try {
+      const user = await updateUserProfile(credentials);
+      set({ user, isLoading: false, error: null });
+      return true;
+    } catch (error) {
+      set({
+        isLoading: false,
+        error:
+          error instanceof Error ? error.message : 'Profil güncellenirken bir hata oluştu.',
       });
       return false;
     }

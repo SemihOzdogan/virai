@@ -13,3 +13,9 @@ export type LoginCredentials = {
 export type RegisterCredentials = LoginCredentials & {
   name: string;
 };
+
+export type UpdateProfileCredentials = {
+  name: string;
+  currentPassword?: string;
+  newPassword?: string;
+};

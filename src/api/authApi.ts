@@ -1,11 +1,14 @@
 import {
+  EmailAuthProvider,
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
   onAuthStateChanged,
+  reauthenticateWithCredential,
   sendPasswordResetEmail,
   signInWithCredential,
   signInWithEmailAndPassword,
   signOut,
+  updatePassword,
   updateProfile,
   type User,
 } from '@firebase/auth';
@@ -18,7 +21,12 @@ import {
   isFirebaseConfigured,
 } from '../config/firebase';
 import { getAuthSessionExpiresAt } from '../utils/authSession';
-import type { AppUser, LoginCredentials, RegisterCredentials } from '../types/user';
+import type {
+  AppUser,
+  LoginCredentials,
+  RegisterCredentials,
+  UpdateProfileCredentials,
+} from '../types/user';
 
 function toAppUser(user: User): AppUser {
   return {
@@ -54,6 +62,8 @@ function toAuthError(error: unknown) {
     'auth/email-already-in-use': 'Bu e-posta adresi zaten kayıtlı.',
     'auth/weak-password': 'Şifre en az 6 karakter olmalıdır.',
     'auth/missing-password': 'Şifre alanı zorunludur.',
+    'auth/requires-recent-login': 'Şifrenizi değiştirmek için yeniden giriş yapmalısınız.',
+    'auth/user-mismatch': 'Mevcut şifreniz doğrulanamadı.',
   };
 
   if (messages[code]) {
@@ -170,6 +180,52 @@ export async function sendPasswordReset(email: string) {
 
   try {
     await sendPasswordResetEmail(getFirebaseAuth(), email.trim());
+  } catch (error) {
+    throw new Error(toAuthError(error));
+  }
+}
+
+export async function updateUserProfile({
+  name,
+  currentPassword,
+  newPassword,
+}: UpdateProfileCredentials): Promise<AppUser> {
+  if (!isFirebaseConfigured()) {
+    throw new Error(
+      'Firebase yapılandırması eksik. src/config/firebase.ts dosyasındaki ayarları kontrol edin.',
+    );
+  }
+
+  const auth = getFirebaseAuth();
+  const user = auth.currentUser;
+
+  if (!user) {
+    throw new Error('Profilinizi güncellemek için yeniden giriş yapmalısınız.');
+  }
+
+  try {
+    if (newPassword) {
+      const hasPasswordProvider = user.providerData.some(
+        provider => provider.providerId === 'password',
+      );
+
+      if (!user.email || !hasPasswordProvider) {
+        throw new Error(
+          'Google ile giriş yapılan hesapların şifresi buradan değiştirilemez.',
+        );
+      }
+
+      if (!currentPassword) {
+        throw new Error('Şifrenizi değiştirmek için mevcut şifrenizi girin.');
+      }
+
+      const credential = EmailAuthProvider.credential(user.email, currentPassword);
+      await reauthenticateWithCredential(user, credential);
+      await updatePassword(user, newPassword);
+    }
+
+    await updateProfile(user, { displayName: name.trim() });
+    return toAppUser(user);
   } catch (error) {
     throw new Error(toAuthError(error));
   }

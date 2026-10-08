@@ -4,8 +4,10 @@ import {
   ActivityIndicator,
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Modal,
   PanResponder,
+  Platform,
   Pressable,
   StatusBar,
   StyleSheet,
@@ -234,6 +236,7 @@ export function HomeScreen({ navigation }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const user = useAuthStore(state => state.user);
   const logout = useAuthStore(state => state.logout);
+  const updateProfile = useAuthStore(state => state.updateProfile);
   const isAuthLoading = useAuthStore(state => state.isLoading);
   const conversations = useChatStore(state => state.conversations);
   const subscribeToConversations = useChatStore(
@@ -252,6 +255,14 @@ export function HomeScreen({ navigation }: Props) {
   const [isProfileMenuVisible, setProfileMenuVisible] = useState(false);
   const [isLogoutConfirmationVisible, setLogoutConfirmationVisible] =
     useState(false);
+  const [isEditProfileVisible, setEditProfileVisible] = useState(false);
+  const [profileName, setProfileName] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [profileValidationError, setProfileValidationError] = useState<
+    string | null
+  >(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [conversationToRename, setConversationToRename] =
     useState<Conversation | null>(null);
@@ -306,6 +317,62 @@ export function HomeScreen({ navigation }: Props) {
   const requestLogout = () => {
     setProfileMenuVisible(false);
     setLogoutConfirmationVisible(true);
+  };
+  const openEditProfile = () => {
+    clearError();
+    setProfileValidationError(null);
+    setProfileName(user?.name ?? '');
+    setCurrentPassword('');
+    setNewPassword('');
+    setConfirmNewPassword('');
+    setProfileMenuVisible(false);
+    setEditProfileVisible(true);
+  };
+  const closeEditProfile = () => {
+    if (isAuthLoading) {
+      return;
+    }
+
+    setEditProfileVisible(false);
+    setProfileValidationError(null);
+    clearError();
+  };
+  const saveProfile = async () => {
+    const name = profileName.trim();
+    const isChangingPassword = Boolean(newPassword || confirmNewPassword || currentPassword);
+
+    if (!name) {
+      setProfileValidationError('Lütfen ad soyad alanını doldurun.');
+      return;
+    }
+
+    if (isChangingPassword) {
+      if (!currentPassword) {
+        setProfileValidationError('Şifreyi değiştirmek için mevcut şifrenizi girin.');
+        return;
+      }
+
+      if (newPassword.length < 6) {
+        setProfileValidationError('Yeni şifre en az 6 karakter olmalıdır.');
+        return;
+      }
+
+      if (newPassword !== confirmNewPassword) {
+        setProfileValidationError('Yeni şifreler eşleşmiyor.');
+        return;
+      }
+    }
+
+    setProfileValidationError(null);
+    const updated = await updateProfile({
+      name,
+      currentPassword: isChangingPassword ? currentPassword : undefined,
+      newPassword: isChangingPassword ? newPassword : undefined,
+    });
+
+    if (updated) {
+      setEditProfileVisible(false);
+    }
   };
   const profileInitial = (user?.name?.trim() || user?.email?.trim() || '?')
     .charAt(0)
@@ -557,6 +624,123 @@ export function HomeScreen({ navigation }: Props) {
       <Modal
         animationType="fade"
         transparent
+        visible={isEditProfileVisible}
+        onRequestClose={closeEditProfile}
+        statusBarTranslucent
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalKeyboardAvoidingView}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Profil düzenlemeyi kapat"
+            onPress={closeEditProfile}
+            style={styles.modalBackdrop}
+          >
+            <Pressable style={styles.profileEditor} onPress={() => {}}>
+            <Text style={styles.deleteConfirmationTitle}>Profili düzenle</Text>
+            <Text style={styles.profileEditorDescription}>
+              Hesap bilgilerini güncelleyebilirsin.
+            </Text>
+
+            <Text style={styles.profileEditorLabel}>Ad soyad</Text>
+            <TextInput
+              value={profileName}
+              onChangeText={value => {
+                setProfileName(value);
+                setProfileValidationError(null);
+              }}
+              placeholder="Adınız Soyadınız"
+              placeholderTextColor={colors.placeholder}
+              autoCapitalize="words"
+              autoCorrect={false}
+              maxLength={80}
+              accessibilityLabel="Ad soyad"
+              style={styles.renameInput}
+            />
+
+            <View style={styles.profileEditorDivider} />
+            <Text style={styles.profileEditorPasswordTitle}>Şifre değiştir</Text>
+            <Text style={styles.profileEditorHint}>
+              Şifreni değiştirmek istemiyorsan bu alanları boş bırak.
+            </Text>
+            <TextInput
+              value={currentPassword}
+              onChangeText={value => {
+                setCurrentPassword(value);
+                setProfileValidationError(null);
+              }}
+              placeholder="Mevcut şifre"
+              placeholderTextColor={colors.placeholder}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              accessibilityLabel="Mevcut şifre"
+              style={styles.profileEditorInput}
+            />
+            <TextInput
+              value={newPassword}
+              onChangeText={value => {
+                setNewPassword(value);
+                setProfileValidationError(null);
+              }}
+              placeholder="Yeni şifre (en az 6 karakter)"
+              placeholderTextColor={colors.placeholder}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              accessibilityLabel="Yeni şifre"
+              style={styles.profileEditorInput}
+            />
+            <TextInput
+              value={confirmNewPassword}
+              onChangeText={value => {
+                setConfirmNewPassword(value);
+                setProfileValidationError(null);
+              }}
+              placeholder="Yeni şifreyi tekrar gir"
+              placeholderTextColor={colors.placeholder}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+              returnKeyType="done"
+              onSubmitEditing={saveProfile}
+              accessibilityLabel="Yeni şifreyi tekrar gir"
+              style={styles.profileEditorInput}
+            />
+
+            {profileValidationError ? (
+              <Text style={styles.error}>{profileValidationError}</Text>
+            ) : null}
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            <View style={styles.deleteConfirmationActions}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={closeEditProfile}
+                disabled={isAuthLoading}
+                style={styles.deleteCancelButton}
+              >
+                <Text style={styles.deleteCancelText}>Vazgeç</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={saveProfile}
+                disabled={isAuthLoading}
+                style={styles.profileSaveButton}
+              >
+                <Text style={styles.deleteConfirmText}>
+                  {isAuthLoading ? 'Kaydediliyor...' : 'Kaydet'}
+                </Text>
+              </Pressable>
+            </View>
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
+      </Modal>
+      <Modal
+        animationType="fade"
+        transparent
         visible={isProfileMenuVisible}
         onRequestClose={() => setProfileMenuVisible(false)}
         statusBarTranslucent
@@ -602,6 +786,24 @@ export function HomeScreen({ navigation }: Props) {
                 <Text style={styles.closeButtonText}>×</Text>
               </Pressable>
             </View>
+            <View style={styles.menuDivider} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Profil bilgilerini düzenle"
+              onPress={openEditProfile}
+              style={styles.menuEditProfileButton}
+            >
+              <View style={styles.menuEditProfileIcon}>
+                <Text style={styles.menuEditProfileIconText}>✎</Text>
+              </View>
+              <View style={styles.menuEditProfileCopy}>
+                <Text style={styles.menuEditProfileTitle}>Profili düzenle</Text>
+                <Text style={styles.menuEditProfileSubtitle}>
+                  Ad soyadını veya şifreni güncelle
+                </Text>
+              </View>
+              <Text style={styles.menuEditProfileArrow}>›</Text>
+            </Pressable>
             <View style={styles.menuDivider} />
             <Text style={styles.menuSectionTitle}>Görünüm</Text>
             <ThemeSelector />
@@ -927,10 +1129,20 @@ function createStyles(colors: AppTheme['colors']) {
       padding: 24,
       backgroundColor: 'rgba(0,0,0,0.45)',
     },
+    modalKeyboardAvoidingView: { flex: 1 },
     profileMenu: {
       width: '100%',
       maxWidth: 380,
       padding: 20,
+      borderRadius: 24,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    profileEditor: {
+      width: '100%',
+      maxWidth: 380,
+      padding: 22,
       borderRadius: 24,
       backgroundColor: colors.surface,
       borderWidth: 1,
@@ -1038,6 +1250,27 @@ function createStyles(colors: AppTheme['colors']) {
       fontWeight: '700',
       marginBottom: 10,
     },
+    menuEditProfileButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    menuEditProfileIcon: {
+      width: 38,
+      height: 38,
+      borderRadius: 13,
+      backgroundColor: colors.accentSoft,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    menuEditProfileIconText: {
+      color: colors.accent,
+      fontSize: 20,
+      fontWeight: '700',
+    },
+    menuEditProfileCopy: { flex: 1, marginLeft: 12 },
+    menuEditProfileTitle: { color: colors.text, fontSize: 14, fontWeight: '700' },
+    menuEditProfileSubtitle: { color: colors.textMuted, fontSize: 12, marginTop: 3 },
+    menuEditProfileArrow: { color: colors.textMuted, fontSize: 24 },
     menuLogoutButton: {
       alignItems: 'center',
       marginTop: 20,
@@ -1046,5 +1279,49 @@ function createStyles(colors: AppTheme['colors']) {
       backgroundColor: colors.accentSoft,
     },
     menuLogoutText: { color: colors.accent, fontSize: 14, fontWeight: '700' },
+    profileEditorDescription: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      marginTop: 6,
+    },
+    profileEditorLabel: {
+      color: colors.textSecondary,
+      fontSize: 13,
+      fontWeight: '700',
+      marginTop: 18,
+      marginBottom: -8,
+    },
+    profileEditorDivider: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginVertical: 20,
+    },
+    profileEditorPasswordTitle: { color: colors.text, fontSize: 15, fontWeight: '700' },
+    profileEditorHint: {
+      color: colors.textMuted,
+      fontSize: 12,
+      lineHeight: 18,
+      marginTop: 4,
+      marginBottom: 10,
+    },
+    profileEditorInput: {
+      color: colors.text,
+      backgroundColor: colors.input,
+      borderColor: colors.border,
+      borderWidth: 1,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 10,
+      marginTop: 9,
+      fontSize: 15,
+    },
+    profileSaveButton: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 11,
+      borderRadius: 13,
+      backgroundColor: colors.accent,
+    },
   });
 }
