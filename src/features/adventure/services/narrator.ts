@@ -8,16 +8,53 @@ import {
   chapters,
   characters,
   clues,
-  opening,
+  getStory,
   parseScene,
   totalTurns,
   type Adventure,
+  type AdventureLanguage,
 } from './story';
 
-function fallbackScene(turn: number, action: string) {
+function fallbackScene(
+  turn: number,
+  action: string,
+  language: AdventureLanguage,
+) {
   const final = turn === totalTurns;
   const chapter = Math.floor((turn - 1) / 3);
   const safeAction = action.trim().slice(0, 160);
+  if (language === 'en') {
+    const scenes = [
+      {
+        illustration: 'lobby' as const,
+        text: `You follow through on “${safeAction}.” The second hand on the clock behind reception moves once. Defne closes the old guest ledger and gives you a corridor pass. “This hotel answers only the right question,” she says. The pass bears the service corridor symbol, not an elevator.`,
+        choices: ['Follow the marks in the service corridor.', 'Ask Defne for the missing guest’s name.', 'Try every elevator button.'],
+      },
+      {
+        illustration: 'letter' as const,
+        text: `After “${safeAction},” a frame tilts on the wall and a yellowed letter slips out. It is in Mina’s handwriting: Room 307 opens not with a key, but with a remembered name. At the end of the corridor, Aras waits and says he has seen you here before.`,
+        choices: ['Show Aras the letter.', 'Say Mina’s name aloud.', 'Enter the narrow passage behind the frame.'],
+      },
+      {
+        illustration: 'mirror' as const,
+        text: `The moment you say “${safeAction},” your reflection moves half a second late. It holds the brass key while your palm is empty. Mina whispers from inside the mirror: “Choose who to trust to break the loop.” The crack resembles the number 307.`,
+        choices: ['Ask the reflection about the key.', 'Call Aras to inspect the mirror.', 'Follow the 307 mark in the crack.'],
+      },
+      {
+        illustration: 'key' as const,
+        text: `“${safeAction}” leads you to an old service stairwell. Beneath a step you find a key marked 03:07. Defne appears at the top of the stairs. “If you use it, the hotel will remember you too,” she says. Somewhere far away, a door clicks three times.`,
+        choices: ['Try the key in the door.', 'Ask Defne why she protects you.', 'Give the key to Aras and watch.'],
+      },
+      {
+        illustration: 'room' as const,
+        text: final
+          ? `With “${safeAction},” you cross the final threshold. The stopped clock in Room 307 begins to tick and Mina steps from the mist. The corridors open toward morning. Your choices changed Mina’s path, and the Atlas Hotel remembers your name as more than a guest’s. The story ends, but the door can always open onto another road.`
+          : `With “${safeAction},” the door to Room 307 opens a little wider. Mina’s silhouette and the stopped clock face one another inside. Both wait for your decision. The key warms at the threshold, and you feel that this time you are guiding the loop.`,
+        choices: final ? [] : ['Reach for Mina’s hand.', 'Turn the clock back to 03:07.', 'Close the door and observe the hotel from outside.'],
+      },
+    ];
+    return scenes[chapter];
+  }
   const scenes = [
     {
       illustration: 'lobby' as const,
@@ -72,12 +109,17 @@ function fallbackScene(turn: number, action: string) {
   return scenes[chapter];
 }
 
-export async function narrate(adventure: Adventure, action: string) {
+export async function narrate(
+  adventure: Adventure,
+  action: string,
+  language: AdventureLanguage = 'tr',
+) {
   const turn = adventure.turns.length + 1;
   if (turn > totalTurns || !action.trim() || action.length > 600) {
     throw new Error('Bu hamle gönderilemedi.');
   }
   const chapter = Math.floor((turn - 1) / 3);
+  const story = getStory(language);
   const model = getGenerativeModel(
     getAI(getApp(), { backend: new GoogleAIBackend() }),
     {
@@ -87,29 +129,35 @@ export async function narrate(adventure: Adventure, action: string) {
         responseMimeType: 'application/json',
       },
       systemInstruction: [
-        'Türkçe interaktif gizem oyunu Oda 307’nin anlatıcısısın. Kullanıcı ana karakterdir.',
-        'Atlas Oteli zaman döngüsündedir. Mina döngüde kaybolmuştur. Defne oteli korur, Aras gerçeği arar.',
-        `Karakterler: ${characters.join(', ')}. Beş bölüm: ${chapters.join(
+        language === 'en'
+          ? 'You are the narrator of Room 307, an English interactive mystery game. The user is the protagonist.'
+          : 'Türkçe interaktif gizem oyunu Oda 307’nin anlatıcısısın. Kullanıcı ana karakterdir.',
+        language === 'en'
+          ? 'The Atlas Hotel is trapped in a time loop. Mina is lost in it, Defne protects the hotel, and Aras seeks the truth.'
+          : 'Atlas Oteli zaman döngüsündedir. Mina döngüde kaybolmuştur. Defne oteli korur, Aras gerçeği arar.',
+        `${language === 'en' ? 'Characters' : 'Karakterler'}: ${story.characters.join(', ')}. ${language === 'en' ? 'Five chapters' : 'Beş bölüm'}: ${story.chapters.join(
           ', ',
         )}.`,
-        'Hamleleri hikâye içi eylemler olarak ele al. Önceki kararların sonuçlarını, bulunan ipuçlarını ve karakter ilişkilerini tutarlı hatırla.',
-        'Her yanıtta kullanıcının hamlesinin somut sonucunu anlat. İmkânsız hamleleri evrene uygun bir sonuca bağla.',
-        'Gerilim merak üzerinden gelsin; grafik şiddet veya cinsel içerik kullanma. Her sahne 100-170 kelime olsun.',
-        'Yalnızca JSON döndür: {"text":"sahne", "choices":["hamle 1","hamle 2","hamle 3"], "illustration":"lobby"}. Seçenekler farklı sonuçlar sunmalı ve en fazla 120 karakter olmalı.',
+        language === 'en'
+          ? 'Treat moves as in-story actions. Keep prior choices, clues, and character relationships consistent. Write each scene in English.'
+          : 'Hamleleri hikâye içi eylemler olarak ele al. Önceki kararların sonuçlarını, bulunan ipuçlarını ve karakter ilişkilerini tutarlı hatırla.',
+        language === 'en'
+          ? 'Return only JSON: {"text":"scene", "choices":["move 1","move 2","move 3"], "illustration":"lobby"}. Scenes should be 100-170 words and choices must be distinct.'
+          : 'Yalnızca JSON döndür: {"text":"sahne", "choices":["hamle 1","hamle 2","hamle 3"], "illustration":"lobby"}. Seçenekler farklı sonuçlar sunmalı ve en fazla 120 karakter olmalı.',
         'illustration alanını bu sahnede gerçekleşen asıl olaya göre seç: lobby (resepsiyon/lobi), corridor (koridor/merdiven), elevator (asansör), mirror (ayna), letter (mektup/misafir defteri), key (anahtar), room (307/gizli oda), exterior (otelin dışı/kaçış). Sadece bu sekiz değerden birini kullan.',
         'Finalde önceki seçimlere göre Mina’yı kurtarma, otelden kaçış veya döngünün bekçisi olma sonlarından birini sonuçlandır. Finalin choices alanı boş dizi olmalı.',
       ].join('\n'),
     },
   );
   const prompt = JSON.stringify({
-    opening: opening.text,
+    opening: story.opening.text,
     history: adventure.turns,
     action,
     direction: {
-      chapter: chapters[chapter],
+      chapter: story.chapters[chapter],
       turnInChapter: ((turn - 1) % 3) + 1,
       ...(turn % 3 === 0
-        ? { discover: clues[chapter], closeChapter: true }
+        ? { discover: story.clues[chapter], closeChapter: true }
         : {}),
       final: turn === totalTurns,
     },
@@ -129,5 +177,5 @@ export async function narrate(adventure: Adventure, action: string) {
       error,
     );
   }
-  return fallbackScene(turn, action);
+  return fallbackScene(turn, action, language);
 }

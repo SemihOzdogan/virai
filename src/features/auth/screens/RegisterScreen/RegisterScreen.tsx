@@ -14,6 +14,7 @@ import type { StackScreenProps } from '@react-navigation/stack';
 
 import { useAuthStore } from '../../store/authStore';
 import { useTheme } from '../../../../theme';
+import { useI18n } from '../../../../i18n';
 import { createStyles } from './RegisterScreen.styles';
 import type { RootStackParamList } from '../../../../types/navigation';
 
@@ -21,6 +22,7 @@ type Props = StackScreenProps<RootStackParamList, 'Register'>;
 
 export function RegisterScreen({ navigation }: Props) {
   const { colors, isDark } = useTheme();
+  const { t } = useI18n();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -39,22 +41,22 @@ export function RegisterScreen({ navigation }: Props) {
 
   const handleRegister = async () => {
     if (!name.trim() || !email.trim() || !password || !confirmPassword) {
-      setValidationError('Lütfen tüm alanları doldurun.');
+      setValidationError(t('validationAllFields'));
       return;
     }
 
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) {
-      setValidationError('Geçerli bir e-posta adresi girin.');
+      setValidationError(t('validationEmail'));
       return;
     }
 
     if (password.length < 6) {
-      setValidationError('Şifre en az 6 karakter olmalıdır.');
+      setValidationError(t('validationPasswordLength'));
       return;
     }
 
     if (password !== confirmPassword) {
-      setValidationError('Şifreler eşleşmiyor.');
+      setValidationError(t('validationPasswordsMatch'));
       return;
     }
 
@@ -76,7 +78,7 @@ export function RegisterScreen({ navigation }: Props) {
 
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Giriş ekranına dön"
+            accessibilityLabel={t('backToLogin')}
             onPress={() => navigation.goBack()}
             style={styles.backButton}>
             <Text style={styles.backText}>‹</Text>
@@ -90,12 +92,12 @@ export function RegisterScreen({ navigation }: Props) {
                 <Text style={styles.badgeSpark}>✦</Text>
               </View>
             </View>
-            <Text style={styles.title}>Hesap oluştur</Text>
-            <Text style={styles.subtitle}>Aramıza katılmak için bilgilerini gir.</Text>
+            <Text style={styles.title}>{t('createAccount')}</Text>
+            <Text style={styles.subtitle}>{t('createAccountSubtitle')}</Text>
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.label}>Ad soyad</Text>
+            <Text style={styles.label}>{t('fullName')}</Text>
             <View style={styles.inputWrap}>
               <TextInput
                 value={name}
@@ -103,17 +105,17 @@ export function RegisterScreen({ navigation }: Props) {
                   setName(value);
                   setValidationError(null);
                 }}
-                placeholder="Adınız Soyadınız"
+                placeholder={t('fullNamePlaceholder')}
                 placeholderTextColor={colors.placeholder}
                 autoCapitalize="words"
                 autoCorrect={false}
                 returnKeyType="next"
                 style={styles.input}
-                accessibilityLabel="Ad soyad"
+                accessibilityLabel={t('fullName')}
               />
             </View>
 
-            <Text style={styles.label}>E-posta</Text>
+            <Text style={styles.label}>{t('email')}</Text>
             <View style={styles.inputWrap}>
               <TextInput
                 value={email}
@@ -121,18 +123,18 @@ export function RegisterScreen({ navigation }: Props) {
                   setEmail(value);
                   setValidationError(null);
                 }}
-                placeholder="Email adresinizi girin"
+                placeholder={t('emailPlaceholder')}
                 placeholderTextColor={colors.placeholder}
                 keyboardType="email-address"
                 autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="next"
                 style={styles.input}
-                accessibilityLabel="E-posta"
+                accessibilityLabel={t('email')}
               />
             </View>
 
-            <Text style={styles.label}>Şifre</Text>
+            <Text style={styles.label}>{t('password')}</Text>
             <View style={styles.inputWrap}>
               <TextInput
                 value={password}
@@ -140,18 +142,18 @@ export function RegisterScreen({ navigation }: Props) {
                   setPassword(value);
                   setValidationError(null);
                 }}
-                placeholder="En az 6 karakter"
+                placeholder={t('newPasswordPlaceholder')}
                 placeholderTextColor={colors.placeholder}
                 secureTextEntry
                 autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="next"
                 style={styles.input}
-                accessibilityLabel="Şifre"
+                accessibilityLabel={t('password')}
               />
             </View>
 
-            <Text style={styles.label}>Şifreyi tekrar gir</Text>
+            <Text style={styles.label}>{t('confirmPassword')}</Text>
             <View style={styles.inputWrap}>
               <TextInput
                 value={confirmPassword}
@@ -159,7 +161,7 @@ export function RegisterScreen({ navigation }: Props) {
                   setConfirmPassword(value);
                   setValidationError(null);
                 }}
-                placeholder="Şifrenizi tekrar girin"
+                placeholder={t('confirmPasswordPlaceholder')}
                 placeholderTextColor={colors.placeholder}
                 secureTextEntry
                 autoCapitalize="none"
@@ -167,7 +169,7 @@ export function RegisterScreen({ navigation }: Props) {
                 returnKeyType="done"
                 onSubmitEditing={handleRegister}
                 style={styles.input}
-                accessibilityLabel="Şifreyi tekrar gir"
+                accessibilityLabel={t('confirmPassword')}
               />
             </View>
 
@@ -180,7 +182,7 @@ export function RegisterScreen({ navigation }: Props) {
               onPress={handleRegister}
               disabled={isLoading}>
               <Text style={styles.primaryButtonText}>
-                {isLoading ? 'Hesap oluşturuluyor...' : 'Kayıt Ol'}
+                {isLoading ? t('creatingAccount') : t('register')}
               </Text>
             </Pressable>
           </View>

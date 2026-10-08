@@ -388,6 +388,19 @@ export function createStyles(colors: AppTheme['colors']) {
       fontWeight: '700',
       marginBottom: 10,
     },
+    preferencesRow: {
+      backgroundColor: colors.surfaceRaised,
+      borderColor: colors.border,
+      borderRadius: 18,
+      borderWidth: 1,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      padding: 12,
+      width: '100%',
+    },
+    preference: {
+      alignItems: 'flex-start',
+    },
     menuEditProfileButton: {
       flexDirection: 'row',
       alignItems: 'center',

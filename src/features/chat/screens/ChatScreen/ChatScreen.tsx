@@ -20,6 +20,7 @@ import { useAuthStore } from '../../../auth/store/authStore';
 import { useChatStore } from '../../store/chatStore';
 import { useSpeechStore } from '../../../speech/store/speechStore';
 import { useTheme } from '../../../../theme';
+import { useI18n } from '../../../../i18n';
 import { animationStyles, createStyles } from './ChatScreen.styles';
 import type { ChatMessage } from '../../types/chat';
 import type { RootStackParamList } from '../../../../types/navigation';
@@ -28,17 +29,6 @@ type Props = StackScreenProps<RootStackParamList, 'Chat'>;
 type SpeechRecognitionApi = typeof import('react-native-speech-recognition-kit');
 
 const EMPTY_MESSAGES: ChatMessage[] = [];
-const STARTER_PROMPTS = [
-  'Bugün için kısa bir çalışma planı hazırla',
-  'Karmaşık bir konuyu basitçe açıkla',
-  'Bir fikrimi geliştirmeme yardım et',
-];
-const INTERVIEW_STARTER_PROMPTS = [
-  'Yazılım geliştirici pozisyonu için pratik yapmak istiyorum',
-  'Yeni mezun ürün yöneticisi mülakatına hazırlanıyorum',
-  'Satış uzmanı rolü için mülakat simülasyonu yapalım',
-];
-
 function getVoiceNotice(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : '';
   const normalizedMessage = message.toLocaleLowerCase('tr-TR');
@@ -131,6 +121,7 @@ function TypingIndicator() {
 
 export function ChatScreen({ navigation, route }: Props) {
   const { colors, isDark } = useTheme();
+  const { t } = useI18n();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { conversationId, title, mode = 'general' } = route.params;
   const user = useAuthStore(state => state.user);
@@ -365,8 +356,10 @@ export function ChatScreen({ navigation, route }: Props) {
   };
 
   const isInterview = mode === 'interview';
-  const displayTitle = title?.trim() || (isInterview ? 'Mülakat simülasyonu' : 'Yeni sohbet');
-  const starterPrompts = isInterview ? INTERVIEW_STARTER_PROMPTS : STARTER_PROMPTS;
+  const displayTitle = title?.trim() || (isInterview ? t('interviewSimulation') : t('newChat'));
+  const starterPrompts = isInterview
+    ? [t('interviewPromptOne'), t('interviewPromptTwo'), t('interviewPromptThree')]
+    : [t('starterPromptOne'), t('starterPromptTwo'), t('starterPromptThree')];
 
   return (
     <SafeAreaView style={styles.safeArea} edges={isPlayerVisible ? ['bottom'] : ['top', 'bottom']}>
@@ -378,14 +371,14 @@ export function ChatScreen({ navigation, route }: Props) {
         <View style={styles.header}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Geri dön"
+            accessibilityLabel={t('back')}
             onPress={() => navigation.goBack()}
             style={styles.backButton}>
             <Text style={styles.backText}>‹</Text>
           </Pressable>
           <View style={styles.headerTitleWrap}>
             <Text numberOfLines={1} style={styles.headerTitle}>{displayTitle}</Text>
-            <Text style={styles.headerSubtitle}>{isInterview ? 'Mülakat koçu' : 'AI Asistan'}</Text>
+            <Text style={styles.headerSubtitle}>{isInterview ? t('interviewCoach') : t('aiAssistantLabel')}</Text>
           </View>
           <View style={styles.headerMark}>
             <Text style={styles.headerMarkText}>✦</Text>
@@ -410,12 +403,12 @@ export function ChatScreen({ navigation, route }: Props) {
                 <Text style={styles.welcomeMarkText}>✦</Text>
               </View>
               <Text style={styles.welcomeTitle}>
-                {isInterview ? 'Mülakata hazır mısın?' : 'Nasıl yardımcı olabilirim?'}
+                {isInterview ? t('readyForInterview') : t('howCanIHelp')}
               </Text>
               <Text style={styles.welcomeText}>
                 {isInterview
-                  ? 'Hedeflediğin rolü yaz; VirAI sırayla soru sorup her yanıtına geri bildirim versin.'
-                  : 'Mesajını yaz, VirAI yanıtlasın. Sohbetin hesabına kaydedilir.'}
+                  ? t('interviewWelcome')
+                  : t('chatWelcome')}
               </Text>
               <View style={styles.starterPrompts}>
                 {starterPrompts.map(prompt => (
@@ -468,8 +461,8 @@ export function ChatScreen({ navigation, route }: Props) {
                           speechStatus !== 'idle' &&
                           speechConversationId === conversationId &&
                           speechMessageId === message.id
-                            ? 'Sesli okumayı durdur'
-                            : 'Yanıtı sesli dinle'
+                            ? t('stopReading')
+                            : t('listenToAnswer')
                         }
                         onPress={() => toggleSpeech(message)}
                         style={styles.speechButton}>
@@ -477,15 +470,15 @@ export function ChatScreen({ navigation, route }: Props) {
                           {speechStatus !== 'idle' &&
                           speechConversationId === conversationId &&
                           speechMessageId === message.id
-                            ? '■ Durdur'
-                            : '▶ Dinle'}
+                            ? `■ ${t('stop')}`
+                            : `▶ ${t('listen')}`}
                         </Text>
                       </Pressable>
                     ) : null}
                     {message.status === 'failed' ? (
                       <>
                         <Text style={styles.failedLabel}>
-                          {message.error ?? error ?? 'Yanıt alınamadı. Lütfen tekrar deneyin.'}
+                          {message.error ?? error ?? t('answerFailed')}
                         </Text>
                         {message.role === 'user' ? (
                           <Pressable
@@ -494,7 +487,7 @@ export function ChatScreen({ navigation, route }: Props) {
                             disabled={isSending || isLoadingMessages}
                             style={styles.retryButton}>
                             <Text style={styles.retryButtonText}>
-                              {isSending ? 'Tekrar deneniyor...' : 'Tekrar dene'}
+                              {isSending ? t('retrying') : t('retry')}
                             </Text>
                           </Pressable>
                         ) : null}
@@ -530,18 +523,18 @@ export function ChatScreen({ navigation, route }: Props) {
             ref={input}
             value={draft}
             onChangeText={setDraft}
-            placeholder={isInterview ? 'Yanıtını yaz...' : 'Mesajını yaz...'}
+            placeholder={isInterview ? t('interviewAnswerPlaceholder') : t('messagePlaceholder')}
             placeholderTextColor={colors.placeholder}
             multiline
             maxLength={6000}
             editable={!isSending && !isListening}
             style={styles.input}
-            accessibilityLabel={isInterview ? 'Mülakat yanıtını yaz' : 'Mesajını yaz'}
+            accessibilityLabel={isInterview ? t('interviewAnswerLabel') : t('messageLabel')}
           />
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={
-              isListening ? 'Sesli girişi durdur' : 'Sesli mesaj yaz'
+              isListening ? t('stopVoiceInput') : t('startVoiceInput')
             }
             accessibilityState={{ selected: isListening, busy: isStartingListening }}
             onPress={toggleVoiceInput}
@@ -557,7 +550,7 @@ export function ChatScreen({ navigation, route }: Props) {
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Mesajı gönder"
+            accessibilityLabel={t('sendMessage')}
             onPress={() => handleSend()}
             disabled={
               !draft.trim() ||
@@ -575,7 +568,7 @@ export function ChatScreen({ navigation, route }: Props) {
           </Pressable>
         </View>
         <Text style={styles.footerNote}>
-          Mesajların VirAI tarafından yanıt oluşturmak için işlenir.
+          {t('messagesPrivacyNote')}
         </Text>
       </KeyboardAvoidingView>
     </SafeAreaView>

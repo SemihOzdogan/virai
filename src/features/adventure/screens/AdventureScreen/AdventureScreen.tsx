@@ -22,12 +22,10 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../../../types/navigation';
 import { useAuthStore } from '../../../auth/store/authStore';
 import { useTheme, type AppTheme } from '../../../../theme';
+import { useI18n } from '../../../../i18n';
 import { createStyles } from './AdventureScreen.styles';
 import {
-  chapters,
-  characters,
-  clues,
-  opening,
+  getStory,
   restoreAdventure,
   totalTurns,
   type Adventure,
@@ -60,6 +58,8 @@ function AdventureGame({
   colors: AppTheme['colors'];
   onBack: () => void;
 }) {
+  const { language, t } = useI18n();
+  const story = getStory(language);
   const [adventure, setAdventure] = useState<Adventure | null>(null);
   const [input, setInput] = useState('');
   const [busy, setBusy] = useState(false);
@@ -86,7 +86,7 @@ function AdventureGame({
       })
       .catch(() => {
         if (active) {
-          setError('Kayıt yüklenemedi. Geri dönüp yeniden dene.');
+          setError(t('adventureLoadError'));
         }
       })
       .finally(() => {
@@ -97,7 +97,7 @@ function AdventureGame({
     return () => {
       active = false;
     };
-  }, [storageKey]);
+  }, [storageKey, t]);
 
   useEffect(() => {
     if (!uid || loading || !adventure) {
@@ -130,7 +130,7 @@ function AdventureGame({
     let stage: 'generate' | 'save' = 'generate';
     try {
       const { narrate } = await import('../../services/narrator');
-      const scene = await narrate(adventure, action);
+      const scene = await narrate(adventure, action, language);
       const next: Adventure = {
         version: 1,
         turns: [...adventure.turns, { ...scene, action }],
@@ -160,12 +160,12 @@ function AdventureGame({
   };
   const restart = () =>
     Alert.alert(
-      'Yeni bir yol dene',
-      'Bu maceranın cihazdaki ilerlemesi sıfırlanacak.',
+      t('restartTitle'),
+      t('restartMessage'),
       [
-        { text: 'Vazgeç', style: 'cancel' },
+        { text: t('cancel'), style: 'cancel' },
         {
-          text: 'Yeniden başla',
+          text: t('restart'),
           style: 'destructive',
           onPress: async () => {
             if (lock.current || !uid) {
@@ -189,7 +189,7 @@ function AdventureGame({
               }
             } catch {
               if (alive.current) {
-                setError('İlerleme sıfırlanamadı. Tekrar dene.');
+                setError(t('adventureResetError'));
               }
             } finally {
               lock.current = false;
@@ -204,14 +204,14 @@ function AdventureGame({
   const count = adventure?.turns.length ?? 0;
   const complete = count === totalTurns;
   const chapter = Math.min(4, Math.floor(count / 3));
-  const scene = adventure?.turns[count - 1] ?? opening;
+  const scene = adventure?.turns[count - 1] ?? story.opening;
   const share = async () => {
     try {
       await Share.share({
         message: `VirAI · Oda 307\nBenim hikâyemin sonu:\n\n${scene.text}`,
       });
     } catch {
-      setError('Hikâye paylaşılamadı. Tekrar dene.');
+      setError(t('shareError'));
     }
   };
   return (
@@ -223,19 +223,19 @@ function AdventureGame({
         <View style={styles.header}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Geri"
+            accessibilityLabel={t('back')}
             onPress={onBack}
             style={styles.backButton}>
             <Text style={styles.backText}>‹</Text>
           </Pressable>
-          <Text style={styles.label}>MACERA</Text>
+          <Text style={styles.label}>{t('adventure')}</Text>
           <Text style={styles.muted}>
             {count}/{totalTurns}
           </Text>
         </View>
         {loading ? (
           <ActivityIndicator
-            accessibilityLabel="Macera yükleniyor"
+            accessibilityLabel={t('adventureLoading')}
             color={colors.accent}
           />
         ) : (
@@ -245,13 +245,13 @@ function AdventureGame({
             keyboardShouldPersistTaps="handled"
           >
             <View style={styles.hero}>
-              <Text style={styles.label}>İNTERAKTİF GİZEM · 5 BÖLÜM</Text>
+              <Text style={styles.label}>{t('interactiveMystery')}</Text>
               <Text style={styles.title}>Oda 307</Text>
               <Text style={styles.subtitle}>
-                Otel seni hatırlıyor. Peki ya sen?
+                {t('adventureHero')}
               </Text>
               <View style={styles.progress}>
-                {chapters.map((title, index) => (
+                {story.chapters.map((title, index) => (
                   <View
                     key={title}
                     style={[
@@ -267,23 +267,23 @@ function AdventureGame({
                 ))}
               </View>
               <Text style={styles.muted}>
-                İlerleme bu cihazda otomatik kaydedilir.
+                {t('adventureAutoSave')}
               </Text>
             </View>
             {adventure && (
               <>
                 <Text style={styles.section}>
                   {complete
-                    ? 'Hikâyenin sonu'
-                    : `Bölüm ${chapter + 1} · ${chapters[chapter]}`}
+                    ? t('storyEnding')
+                    : `${t('chapter', { number: chapter + 1 })} · ${story.chapters[chapter]}`}
                 </Text>
                 {count === 0 && (
                   <Text style={styles.muted}>
-                    Karakterler: {characters.join(' • ')}
+                    {t('characters')}: {story.characters.join(' • ')}
                   </Text>
                 )}
-                <SceneIllustration scene={opening} />
-                <Text style={styles.story}>{opening.text}</Text>
+                <SceneIllustration scene={story.opening} />
+                <Text style={styles.story}>{story.opening.text}</Text>
                 {adventure.turns.map((turn, index) => (
                   <View
                     key={index}
@@ -301,7 +301,7 @@ function AdventureGame({
                     <Text style={styles.story}>{turn.text}</Text>
                     {(index + 1) % 3 === 0 && (
                       <Text style={styles.reward}>
-                        ✧ Bölüm tamamlandı · {clues[Math.floor(index / 3)]}{' '}
+                        ✧ {t('chapter', { number: Math.floor(index / 3) + 1 })} · {story.clues[Math.floor(index / 3)]}{' '}
                         keşfedildi
                       </Text>
                     )}
@@ -310,17 +310,17 @@ function AdventureGame({
                 {count > 0 && (
                   <View style={styles.collection}>
                     <Text style={styles.section}>
-                      Keşif koleksiyonun · {Math.floor(count / 3)}/5
+                      {t('collection')} · {Math.floor(count / 3)}/5
                     </Text>
                     <Text style={styles.muted}>
-                      {clues.slice(0, Math.floor(count / 3)).join('  •  ') ||
-                        'İlk bölümün sonunda ilk ipucunu aç.'}
+                      {story.clues.slice(0, Math.floor(count / 3)).join('  •  ') ||
+                        t('firstClue')}
                     </Text>
                   </View>
                 )}
                 {!complete && (
                   <>
-                    <Text style={styles.section}>Şimdi ne yapacaksın?</Text>
+                    <Text style={styles.section}>{t('whatNext')}</Text>
                     {scene.choices.map(choice => (
                       <Pressable
                         key={choice}
@@ -334,8 +334,8 @@ function AdventureGame({
                       </Pressable>
                     ))}
                     <TextInput
-                      accessibilityLabel="Kendi hamleni yaz"
-                      placeholder="Ya da kendi hamleni yaz…"
+                      accessibilityLabel={t('customMove')}
+                      placeholder={t('customMovePlaceholder')}
                       placeholderTextColor={colors.textMuted}
                       value={input}
                       onChangeText={setInput}
@@ -353,14 +353,14 @@ function AdventureGame({
                         (busy || !input.trim()) && styles.disabled,
                       ]}
                     >
-                      <Text style={styles.primaryText}>Hamleni oyna</Text>
+                      <Text style={styles.primaryText}>{t('playMove')}</Text>
                     </Pressable>
                   </>
                 )}
                 {busy && (
                   <View style={styles.wait}>
                     <ActivityIndicator color={colors.accent} />
-                    <Text style={styles.muted}>Hikâyen yazılıyor…</Text>
+                    <Text style={styles.muted}>{t('writingStory')}</Text>
                   </View>
                 )}
                 {complete && (
@@ -370,7 +370,7 @@ function AdventureGame({
                     style={styles.primary}
                   >
                     <Text style={styles.primaryText}>
-                      Hikâyemin sonunu paylaş
+                      {t('shareEnding')}
                     </Text>
                   </Pressable>
                 )}
@@ -381,7 +381,7 @@ function AdventureGame({
                     onPress={restart}
                     style={styles.back}
                   >
-                    <Text style={styles.muted}>Baştan farklı bir yol dene</Text>
+                    <Text style={styles.muted}>{t('restartAdventure')}</Text>
                   </Pressable>
                 )}
               </>

@@ -13,6 +13,7 @@ import Svg, {
 } from 'react-native-svg';
 import { sceneIllustration, type Scene, type IllustrationName } from '../services/story';
 import { useTheme } from '../../../theme';
+import { useI18n } from '../../../i18n';
 import { styles } from './SceneIllustration.styles';
 
 const captions: Record<IllustrationName, string> = {
@@ -24,6 +25,16 @@ const captions: Record<IllustrationName, string> = {
   key: 'Pirinç anahtar · Bir kapı daha',
   room: 'Oda 307 · Eşiğin ötesi',
   exterior: 'Atlas Oteli · Yağmurun içinde',
+};
+const englishCaptions: Record<IllustrationName, string> = {
+  lobby: 'Atlas Hotel · Midnight reception',
+  corridor: 'Silent corridor · Beyond the doors',
+  elevator: 'Elevator · Toward an unknown floor',
+  mirror: 'Cracked mirror · Another reflection',
+  letter: 'Old records · Hidden traces',
+  key: 'Brass key · One more door',
+  room: 'Room 307 · Beyond the threshold',
+  exterior: 'Atlas Hotel · In the rain',
 };
 const gold = '#EAC689';
 const ink = '#12152C';
@@ -304,14 +315,16 @@ function Artwork({ kind }: { kind: IllustrationName }) {
 
 export function SceneIllustration({ scene }: { scene: Scene }) {
   const { colors } = useTheme();
+  const { language } = useI18n();
   const kind = sceneIllustration(scene);
+  const caption = (language === 'en' ? englishCaptions : captions)[kind];
   const id = `scene${useId().replace(/[^a-zA-Z0-9]/g, '')}`;
   return (
     <View
       style={styles.frame}
       accessible
       accessibilityRole="image"
-      accessibilityLabel={captions[kind]}
+      accessibilityLabel={caption}
     >
       <Svg
         style={styles.artwork}
@@ -341,7 +354,7 @@ export function SceneIllustration({ scene }: { scene: Scene }) {
           },
         ]}
       >
-        {captions[kind]}
+        {caption}
       </Text>
     </View>
   );

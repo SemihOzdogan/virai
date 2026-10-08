@@ -61,6 +61,44 @@ export const opening: Scene = {
     'Misafir defterinde adımı ara.',
   ],
 };
+
+const englishStory = {
+  chapters: [
+    'Midnight arrival',
+    'The missing guest',
+    'Behind the mirror',
+    'The final key',
+    'Room 307',
+  ],
+  characters: [
+    'Defne · Receptionist',
+    'Aras · Detective',
+    'Mina · Missing guest',
+  ],
+  clues: [
+    'The 307 key',
+    'An old guest ledger',
+    'A cracked mirror',
+    'A midnight letter',
+    'The hotel’s secret',
+  ],
+  opening: {
+    illustration: 'lobby' as const,
+    text: 'Escaping the rain, you enter the Atlas Hotel. Every clock on the wall has stopped at 03:07. Before you say a word, the receptionist Defne writes your name in the guest ledger.\n\n“I knew you would come back.” She places a brass key in your palm. “Don’t enter 307 this time.”\n\nThe elevator opens by itself. Someone whispers from inside: “Don’t trust her.”',
+    choices: [
+      'Ask Defne how she knows you.',
+      'Follow the voice in the elevator.',
+      'Look for your name in the guest ledger.',
+    ],
+  },
+};
+
+export type AdventureLanguage = 'tr' | 'en';
+export function getStory(language: AdventureLanguage) {
+  return language === 'en'
+    ? englishStory
+    : { chapters, characters, clues, opening };
+}
 export function parseScene(raw: string, final: boolean): Scene {
   const value = JSON.parse(
     raw.replace(/^\s*```(?:json)?\s*/, '').replace(/\s*```\s*$/, ''),

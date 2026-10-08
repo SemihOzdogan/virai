@@ -3,20 +3,17 @@ import { StyleSheet } from 'react-native';
 export const styles = StyleSheet.create({
   container: {
     alignSelf: 'flex-start',
-    flexDirection: 'row',
-    gap: 3,
-    padding: 3,
-    borderRadius: 14,
   },
   option: {
-    minWidth: 58,
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 11,
+    borderRadius: 15,
+    borderWidth: 1,
+    height: 48,
+    justifyContent: 'center',
+    width: 56,
   },
   label: {
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 23,
+    fontWeight: '500',
   },
 });

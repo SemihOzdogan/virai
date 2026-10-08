@@ -2,49 +2,40 @@ import React from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
 
 import { useTheme, type ThemeMode } from './';
+import { useI18n } from '../i18n/I18nProvider';
 import { styles } from './ThemeSelector.styles';
 
-const options: { mode: ThemeMode; label: string }[] = [
-  { mode: 'system', label: 'Sistem' },
-  { mode: 'light', label: 'Açık' },
-  { mode: 'dark', label: 'Koyu' },
-];
-
 export function ThemeSelector() {
-  const { mode, setMode, colors } = useTheme();
-  const handleModeChange = (nextMode: ThemeMode) => {
+  const { isDark, setMode, colors } = useTheme();
+  const { t } = useI18n();
+  const nextMode: ThemeMode = isDark ? 'light' : 'dark';
+  const nextModeLabel = t(isDark ? 'themeLight' : 'themeDark');
+
+  const handleModeChange = () => {
     setMode(nextMode).catch(error => {
       console.warn('Tema tercihi kaydedilemedi.', error);
-      Alert.alert('Tema tercihi kaydedilemedi', 'Görünüm değişti ancak tercih saklanamadı.');
+      Alert.alert(t('themeSaveErrorTitle'), t('themeSaveErrorMessage'));
     });
   };
 
   return (
-    <View
-      accessibilityLabel="Görünüm teması"
-      style={[styles.container, { backgroundColor: colors.surfaceRaised }]}>
-      {options.map(option => {
-        const selected = mode === option.mode;
-        return (
-          <Pressable
-            key={option.mode}
-            accessibilityRole="button"
-            accessibilityState={{ selected }}
-            onPress={() => handleModeChange(option.mode)}
-            style={[
-              styles.option,
-              selected && { backgroundColor: colors.accent },
-            ]}>
-            <Text
-              style={[
-                styles.label,
-                { color: selected ? colors.onAccent : colors.textSecondary },
-              ]}>
-              {option.label}
-            </Text>
-          </Pressable>
-        );
-      })}
+    <View style={styles.container}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={nextModeLabel}
+        onPress={handleModeChange}
+        style={({ pressed }) => [
+          styles.option,
+          {
+            backgroundColor: colors.accentSoft,
+            borderColor: colors.border,
+            opacity: pressed ? 0.72 : 1,
+          },
+        ]}>
+        <Text style={[styles.label, { color: colors.accent }]}>
+          {isDark ? '☀️' : '🌙'}
+        </Text>
+      </Pressable>
     </View>
   );
 }

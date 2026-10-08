@@ -16,6 +16,7 @@ import type { StackScreenProps } from '@react-navigation/stack';
 
 import { useAuthStore } from '../../store/authStore';
 import { useTheme } from '../../../../theme';
+import { useI18n } from '../../../../i18n';
 import { createStyles } from './LoginScreen.styles';
 import type { RootStackParamList } from '../../../../types/navigation';
 
@@ -23,6 +24,7 @@ type Props = StackScreenProps<RootStackParamList, 'Login'>;
 
 export function LoginScreen({ navigation }: Props) {
   const { colors, isDark } = useTheme();
+  const { t } = useI18n();
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -43,7 +45,7 @@ export function LoginScreen({ navigation }: Props) {
 
   const handleLogin = async () => {
     if (!email.trim() || !password.trim()) {
-      Alert.alert('Hata', 'E-posta ve şifre alanlarını doldurmalısın.');
+      Alert.alert(t('loginRequiredTitle'), t('loginRequiredMessage'));
       return;
     }
 
@@ -52,14 +54,14 @@ export function LoginScreen({ navigation }: Props) {
 
   const handlePasswordReset = async () => {
     if (!email.trim()) {
-      Alert.alert('E-posta gerekli', 'Şifre sıfırlama bağlantısı için e-posta adresini girin.');
+      Alert.alert(t('resetEmailRequiredTitle'), t('resetEmailRequiredMessage'));
       return;
     }
 
     const sent = await requestPasswordReset(email);
 
     if (sent) {
-      Alert.alert('E-postanızı kontrol edin', 'Şifre sıfırlama bağlantısı gönderildi.');
+      Alert.alert(t('resetSentTitle'), t('resetSentMessage'));
     }
   };
 
@@ -88,18 +90,18 @@ export function LoginScreen({ navigation }: Props) {
                 <Text style={styles.badgeSpark}>✦</Text>
               </View>
             </View>
-            <Text style={styles.title}>Hoş geldin</Text>
-            <Text style={styles.subtitle}>Devam etmek için giriş yap.</Text>
+            <Text style={styles.title}>{t('loginWelcome')}</Text>
+            <Text style={styles.subtitle}>{t('loginSubtitle')}</Text>
           </View>
 
           <View style={styles.card}>
-            <Text style={styles.label}>E-posta</Text>
+            <Text style={styles.label}>{t('email')}</Text>
             <View style={styles.inputWrap}>
               <Text style={styles.inputIcon}>✉️</Text>
               <TextInput
                 value={email}
                 onChangeText={setEmail}
-                placeholder="Email adresinizi girin"
+                placeholder={t('emailPlaceholder')}
                 placeholderTextColor={colors.placeholder}
                 keyboardType="email-address"
                 autoCapitalize="none"
@@ -108,13 +110,13 @@ export function LoginScreen({ navigation }: Props) {
               />
             </View>
 
-            <Text style={styles.label}>Şifre</Text>
+            <Text style={styles.label}>{t('password')}</Text>
             <View style={styles.inputWrap}>
               <Text style={styles.inputIcon}>🔒</Text>
               <TextInput
                 value={password}
                 onChangeText={setPassword}
-                placeholder="Şifrenizi girin"
+                placeholder={t('passwordPlaceholder')}
                 placeholderTextColor={colors.placeholder}
                 secureTextEntry={!showPassword}
                 autoCapitalize="none"
@@ -130,7 +132,7 @@ export function LoginScreen({ navigation }: Props) {
 
             <View style={styles.row}>
               <Pressable onPress={handlePasswordReset} disabled={isLoading}>
-                <Text style={styles.forgotText}>Şifremi unuttum</Text>
+                <Text style={styles.forgotText}>{t('forgotPassword')}</Text>
               </Pressable>
             </View>
 
@@ -144,20 +146,20 @@ export function LoginScreen({ navigation }: Props) {
               onPress={handleLogin}
               disabled={isLoading}>
               <Text style={styles.primaryButtonText}>
-                {isEmailLoginLoading ? 'Giriş yapılıyor...' : 'Giriş Yap'}
+                {isEmailLoginLoading ? t('loggingIn') : t('login')}
               </Text>
             </Pressable>
 
             <View style={styles.dividerRow}>
               <View style={styles.divider} />
-              <Text style={styles.dividerText}>veya</Text>
+              <Text style={styles.dividerText}>{t('or')}</Text>
               <View style={styles.divider} />
             </View>
 
             <View style={styles.socialRow}>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Google ile devam et"
+                accessibilityLabel={t('continueWithGoogle')}
                 style={styles.socialButton}
                 onPress={handleGoogleLogin}
                 disabled={isLoading}>
@@ -180,16 +182,16 @@ export function LoginScreen({ navigation }: Props) {
                   />
                 </Svg>
                 <Text style={styles.socialText}>
-                  {isGoogleLoginLoading ? 'Bağlanıyor...' : 'Google ile devam et'}
+                  {isGoogleLoginLoading ? t('connecting') : t('continueWithGoogle')}
                 </Text>
               </Pressable>
             </View>
           </View>
 
           <View style={styles.footer}>
-            <Text style={styles.footerText}>Hesabın yok mu?</Text>
+            <Text style={styles.footerText}>{t('noAccount')}</Text>
             <Pressable onPress={() => navigation.navigate('Register')}>
-              <Text style={styles.signupText}>Kayıt ol</Text>
+              <Text style={styles.signupText}>{t('signUp')}</Text>
             </Pressable>
           </View>
         </ScrollView>

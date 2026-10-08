@@ -14,6 +14,7 @@ import { SpeechPlayer } from './src/features/speech/components/SpeechPlayer';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { useSpeechStore } from './src/features/speech/store/speechStore';
 import { ThemeProvider, useTheme } from './src/theme';
+import { I18nProvider } from './src/i18n';
 import { styles } from './src/App.styles';
 import { useAuthStore } from './src/features/auth/store/authStore';
 import type { RootStackParamList } from './src/types/navigation';
@@ -38,9 +39,11 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <ThemeProvider>
-        <ThemedNavigation />
-      </ThemeProvider>
+      <I18nProvider>
+        <ThemeProvider>
+          <ThemedNavigation />
+        </ThemeProvider>
+      </I18nProvider>
     </SafeAreaProvider>
   );
 }

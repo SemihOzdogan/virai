@@ -24,6 +24,7 @@ import { useChatStore } from '../../store/chatStore';
 import { useSpeechStore } from '../../../speech/store/speechStore';
 import { ThemeSelector } from '../../../../theme/ThemeSelector';
 import { useTheme } from '../../../../theme';
+import { LanguageSelector, useI18n } from '../../../../i18n';
 import { createStyles, rowActionsWidth } from './HomeScreen.styles';
 import type { Conversation } from '../../types/chat';
 import type { RootStackParamList } from '../../../../types/navigation';
@@ -37,12 +38,12 @@ type ConversationRowProps = {
   onRename: (conversation: Conversation) => void;
 };
 
-function formatDate(date: Date | null) {
+function formatDate(date: Date | null, locale: string, justNow: string) {
   if (!date) {
-    return 'Az önce';
+    return justNow;
   }
 
-  return new Intl.DateTimeFormat('tr-TR', {
+  return new Intl.DateTimeFormat(locale, {
     day: 'numeric',
     month: 'short',
     hour: '2-digit',
@@ -57,6 +58,7 @@ function ConversationRow({
   onRename,
 }: ConversationRowProps) {
   const { colors } = useTheme();
+  const { language, t } = useI18n();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const translateX = useRef(new Animated.Value(0)).current;
   const isOpen = useRef(false);
@@ -114,7 +116,7 @@ function ConversationRow({
         <View style={styles.rowActions}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${item.title} sohbetinin başlığını düzenle`}
+            accessibilityLabel={t('editChat')}
             onPress={() => onRename(item)}
             style={({ pressed }) => [
               styles.rowActionButton,
@@ -128,7 +130,7 @@ function ConversationRow({
           </Pressable>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel={`${item.title} sohbetini sil`}
+            accessibilityLabel={t('deleteChat')}
             disabled={isDeleting}
             onPress={() => setDeleteConfirmationVisible(true)}
             android_ripple={{ color: 'rgba(255,255,255,0.14)' }}
@@ -177,7 +179,7 @@ function ConversationRow({
                   {item.title}
                 </Text>
                 <Text style={styles.conversationMeta}>
-                  VirAI · {formatDate(item.updatedAt)}
+                  VirAI · {formatDate(item.updatedAt, language === 'tr' ? 'tr-TR' : 'en-US', t('justNow'))}
                 </Text>
               </View>
               <Text style={styles.chevron}>›</Text>
@@ -194,17 +196,16 @@ function ConversationRow({
       >
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Onayı kapat"
+          accessibilityLabel={t('close')}
           onPress={() => setDeleteConfirmationVisible(false)}
           style={styles.modalBackdrop}
         >
           <Pressable style={styles.deleteConfirmation} onPress={() => {}}>
             <Text style={styles.deleteConfirmationTitle}>
-              Sohbet silinsin mi?
+              {t('deleteChatTitle')}
             </Text>
             <Text style={styles.deleteConfirmationMessage}>
-              “{item.title}” sohbeti ve içindeki tüm mesajlar kalıcı olarak
-              silinecek.
+              {t('deleteChatMessage', { title: item.title })}
             </Text>
             <View style={styles.deleteConfirmationActions}>
               <Pressable
@@ -212,14 +213,14 @@ function ConversationRow({
                 onPress={() => setDeleteConfirmationVisible(false)}
                 style={styles.deleteCancelButton}
               >
-                <Text style={styles.deleteCancelText}>Vazgeç</Text>
+                <Text style={styles.deleteCancelText}>{t('cancel')}</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
                 onPress={deleteConversation}
                 style={styles.deleteConfirmButton}
               >
-                <Text style={styles.deleteConfirmText}>Sohbeti sil</Text>
+                <Text style={styles.deleteConfirmText}>{t('deleteChat')}</Text>
               </Pressable>
             </View>
           </Pressable>
@@ -231,6 +232,7 @@ function ConversationRow({
 
 export function HomeScreen({ navigation }: Props) {
   const { colors, isDark } = useTheme();
+  const { language, t } = useI18n();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const user = useAuthStore(state => state.user);
   const logout = useAuthStore(state => state.logout);
@@ -301,7 +303,7 @@ export function HomeScreen({ navigation }: Props) {
 
     navigation.navigate('Chat', {
       conversationId: createConversationId(user.id),
-      title: 'Mülakat simülasyonu',
+      title: t('interviewSimulation'),
       mode: 'interview',
     });
   };
@@ -340,23 +342,23 @@ export function HomeScreen({ navigation }: Props) {
     const isChangingPassword = Boolean(newPassword || confirmNewPassword || currentPassword);
 
     if (!name) {
-      setProfileValidationError('Lütfen ad soyad alanını doldurun.');
+      setProfileValidationError(t('profileNameRequired'));
       return;
     }
 
     if (isChangingPassword) {
       if (!currentPassword) {
-        setProfileValidationError('Şifreyi değiştirmek için mevcut şifrenizi girin.');
+        setProfileValidationError(t('currentPasswordRequired'));
         return;
       }
 
       if (newPassword.length < 6) {
-        setProfileValidationError('Yeni şifre en az 6 karakter olmalıdır.');
+        setProfileValidationError(t('newPasswordLength'));
         return;
       }
 
       if (newPassword !== confirmNewPassword) {
-        setProfileValidationError('Yeni şifreler eşleşmiyor.');
+        setProfileValidationError(t('newPasswordsMatch'));
         return;
       }
     }
@@ -374,7 +376,7 @@ export function HomeScreen({ navigation }: Props) {
   };
   const profileInitial = (user?.name?.trim() || user?.email?.trim() || '?')
     .charAt(0)
-    .toLocaleUpperCase('tr-TR');
+    .toLocaleUpperCase(language === 'tr' ? 'tr-TR' : 'en-US');
 
   const openConversation = (conversation: Conversation) => {
     navigation.navigate('Chat', {
@@ -417,11 +419,13 @@ export function HomeScreen({ navigation }: Props) {
     }
   };
 
-  const normalizedSearchQuery = searchQuery.trim().toLocaleLowerCase('tr-TR');
+  const normalizedSearchQuery = searchQuery
+    .trim()
+    .toLocaleLowerCase(language === 'tr' ? 'tr-TR' : 'en-US');
   const visibleConversations = normalizedSearchQuery
     ? conversations.filter(conversation =>
         conversation.title
-          .toLocaleLowerCase('tr-TR')
+          .toLocaleLowerCase(language === 'tr' ? 'tr-TR' : 'en-US')
           .includes(normalizedSearchQuery),
       )
     : conversations;
@@ -444,12 +448,12 @@ export function HomeScreen({ navigation }: Props) {
       <View style={styles.container}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.eyebrow}>AI ASİSTAN</Text>
-            <Text style={styles.title}>Sohbetlerin</Text>
+            <Text style={styles.eyebrow}>{t('aiAssistant')}</Text>
+            <Text style={styles.title}>{t('yourChats')}</Text>
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Profil ve uygulama seçenekleri"
+            accessibilityLabel={t('profileOptions')}
             accessibilityState={{ expanded: isProfileMenuVisible }}
             onPress={() => setProfileMenuVisible(true)}
             style={styles.profileButton}
@@ -466,10 +470,10 @@ export function HomeScreen({ navigation }: Props) {
         </View>
 
         <Text style={styles.greeting}>
-          Merhaba{user?.name ? `, ${user.name.split(' ')[0]}` : ''}
+          {t('greeting', { name: user?.name ? `, ${user.name.split(' ')[0]}` : '' })}
         </Text>
         <Text style={styles.description}>
-          VirAI ile sohbet et, konuşmalarına istediğin zaman devam et.
+          {t('homeDescription')}
         </Text>
 
         <Pressable
@@ -479,15 +483,15 @@ export function HomeScreen({ navigation }: Props) {
         >
           <Text style={styles.newChatIcon}>＋</Text>
           <View style={styles.newChatCopy}>
-            <Text style={styles.newChatTitle}>Yeni sohbet</Text>
-            <Text style={styles.newChatSubtitle}>VirAI ile başla</Text>
+            <Text style={styles.newChatTitle}>{t('newChat')}</Text>
+            <Text style={styles.newChatSubtitle}>{t('startWithVirai')}</Text>
           </View>
           <Text style={styles.newChatArrow}>›</Text>
         </Pressable>
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Mülakat simülasyonunu başlat"
+          accessibilityLabel={t('startInterview')}
           onPress={startInterview}
           style={styles.interviewButton}
         >
@@ -495,9 +499,9 @@ export function HomeScreen({ navigation }: Props) {
             <Text style={styles.interviewIconText}>⌁</Text>
           </View>
           <View style={styles.newChatCopy}>
-            <Text style={styles.interviewTitle}>Mülakat simülasyonu</Text>
+            <Text style={styles.interviewTitle}>{t('interviewSimulation')}</Text>
             <Text style={styles.interviewSubtitle}>
-              Soruları yanıtla, anlık geri bildirim al
+              {t('interviewDescription')}
             </Text>
           </View>
           <Text style={styles.interviewArrow}>›</Text>
@@ -505,7 +509,7 @@ export function HomeScreen({ navigation }: Props) {
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Macera: Oda 307, başla veya devam et"
+          accessibilityLabel={t('startAdventure')}
           onPress={() => navigation.navigate('Adventure')}
           style={styles.interviewButton}
         >
@@ -513,16 +517,16 @@ export function HomeScreen({ navigation }: Props) {
             <Text style={styles.interviewIconText}>✧</Text>
           </View>
           <View style={styles.newChatCopy}>
-            <Text style={styles.interviewTitle}>Macera · Oda 307</Text>
+            <Text style={styles.interviewTitle}>{t('adventureTitle')}</Text>
             <Text style={styles.interviewSubtitle}>
-              Otel seni hatırlıyor. Hikâyene gir
+              {t('adventureDescription')}
             </Text>
           </View>
           <Text style={styles.interviewArrow}>›</Text>
         </Pressable>
 
         <View style={styles.listHeader}>
-          <Text style={styles.listTitle}>Geçmiş sohbetler</Text>
+          <Text style={styles.listTitle}>{t('pastChats')}</Text>
           <Text style={styles.listCount}>{conversations.length}</Text>
         </View>
 
@@ -530,10 +534,10 @@ export function HomeScreen({ navigation }: Props) {
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Sohbetlerde ara..."
+            placeholder={t('searchChats')}
             placeholderTextColor={colors.placeholder}
             returnKeyType="search"
-            accessibilityLabel="Sohbetlerde ara"
+            accessibilityLabel={t('searchChats')}
             style={styles.searchInput}
           />
         ) : null}
@@ -547,16 +551,16 @@ export function HomeScreen({ navigation }: Props) {
         ) : conversations.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>✧</Text>
-            <Text style={styles.emptyTitle}>Henüz sohbet yok</Text>
+            <Text style={styles.emptyTitle}>{t('noChats')}</Text>
             <Text style={styles.emptyText}>
-              İlk sohbetini başlatınca burada görünecek.
+              {t('noChatsDescription')}
             </Text>
           </View>
         ) : visibleConversations.length === 0 ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>Sonuç bulunamadı</Text>
+            <Text style={styles.emptyTitle}>{t('noResults')}</Text>
             <Text style={styles.emptyText}>
-              Farklı bir sohbet adıyla tekrar ara.
+              {t('noResultsDescription')}
             </Text>
           </View>
         ) : (
@@ -584,7 +588,7 @@ export function HomeScreen({ navigation }: Props) {
         >
           <Pressable style={styles.deleteConfirmation} onPress={() => {}}>
             <Text style={styles.deleteConfirmationTitle}>
-              Sohbet başlığını düzenle
+              {t('editChatTitle')}
             </Text>
             <TextInput
               value={renameTitle}
@@ -592,7 +596,7 @@ export function HomeScreen({ navigation }: Props) {
               maxLength={60}
               autoFocus
               selectTextOnFocus
-              accessibilityLabel="Yeni sohbet başlığı"
+              accessibilityLabel={t('newChatTitle')}
               style={styles.renameInput}
             />
             {error ? <Text style={styles.error}>{error}</Text> : null}
@@ -603,7 +607,7 @@ export function HomeScreen({ navigation }: Props) {
                 disabled={isRenaming}
                 style={styles.deleteCancelButton}
               >
-                <Text style={styles.deleteCancelText}>Vazgeç</Text>
+                <Text style={styles.deleteCancelText}>{t('cancel')}</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
@@ -612,7 +616,7 @@ export function HomeScreen({ navigation }: Props) {
                 style={styles.deleteConfirmButton}
               >
                 <Text style={styles.deleteConfirmText}>
-                  {isRenaming ? 'Kaydediliyor...' : 'Kaydet'}
+                  {isRenaming ? t('saving') : t('save')}
                 </Text>
               </Pressable>
             </View>
@@ -637,19 +641,19 @@ export function HomeScreen({ navigation }: Props) {
             style={styles.modalBackdrop}
           >
             <Pressable style={styles.profileEditor} onPress={() => {}}>
-            <Text style={styles.deleteConfirmationTitle}>Profili düzenle</Text>
+            <Text style={styles.deleteConfirmationTitle}>{t('editProfile')}</Text>
             <Text style={styles.profileEditorDescription}>
-              Hesap bilgilerini güncelleyebilirsin.
+              {t('editProfileDescription')}
             </Text>
 
-            <Text style={styles.profileEditorLabel}>Ad soyad</Text>
+            <Text style={styles.profileEditorLabel}>{t('fullName')}</Text>
             <TextInput
               value={profileName}
               onChangeText={value => {
                 setProfileName(value);
                 setProfileValidationError(null);
               }}
-              placeholder="Adınız Soyadınız"
+              placeholder={t('fullNamePlaceholder')}
               placeholderTextColor={colors.placeholder}
               autoCapitalize="words"
               autoCorrect={false}
@@ -659,9 +663,9 @@ export function HomeScreen({ navigation }: Props) {
             />
 
             <View style={styles.profileEditorDivider} />
-            <Text style={styles.profileEditorPasswordTitle}>Şifre değiştir</Text>
+            <Text style={styles.profileEditorPasswordTitle}>{t('changePassword')}</Text>
             <Text style={styles.profileEditorHint}>
-              Şifreni değiştirmek istemiyorsan bu alanları boş bırak.
+              {t('leavePasswordBlank')}
             </Text>
             <TextInput
               value={currentPassword}
@@ -669,7 +673,7 @@ export function HomeScreen({ navigation }: Props) {
                 setCurrentPassword(value);
                 setProfileValidationError(null);
               }}
-              placeholder="Mevcut şifre"
+              placeholder={t('currentPassword')}
               placeholderTextColor={colors.placeholder}
               secureTextEntry
               autoCapitalize="none"
@@ -683,7 +687,7 @@ export function HomeScreen({ navigation }: Props) {
                 setNewPassword(value);
                 setProfileValidationError(null);
               }}
-              placeholder="Yeni şifre (en az 6 karakter)"
+              placeholder={t('newPasswordPlaceholder')}
               placeholderTextColor={colors.placeholder}
               secureTextEntry
               autoCapitalize="none"
@@ -697,7 +701,7 @@ export function HomeScreen({ navigation }: Props) {
                 setConfirmNewPassword(value);
                 setProfileValidationError(null);
               }}
-              placeholder="Yeni şifreyi tekrar gir"
+              placeholder={t('confirmPassword')}
               placeholderTextColor={colors.placeholder}
               secureTextEntry
               autoCapitalize="none"
@@ -719,7 +723,7 @@ export function HomeScreen({ navigation }: Props) {
                 disabled={isAuthLoading}
                 style={styles.deleteCancelButton}
               >
-                <Text style={styles.deleteCancelText}>Vazgeç</Text>
+                <Text style={styles.deleteCancelText}>{t('cancel')}</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
@@ -728,7 +732,7 @@ export function HomeScreen({ navigation }: Props) {
                 style={styles.profileSaveButton}
               >
                 <Text style={styles.deleteConfirmText}>
-                  {isAuthLoading ? 'Kaydediliyor...' : 'Kaydet'}
+                  {isAuthLoading ? t('saving') : t('save')}
                 </Text>
               </Pressable>
             </View>
@@ -777,7 +781,7 @@ export function HomeScreen({ navigation }: Props) {
               </View>
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel="Menüyü kapat"
+                accessibilityLabel={t('closeMenu')}
                 onPress={() => setProfileMenuVisible(false)}
                 style={styles.closeButton}
               >
@@ -787,7 +791,7 @@ export function HomeScreen({ navigation }: Props) {
             <View style={styles.menuDivider} />
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Profil bilgilerini düzenle"
+              accessibilityLabel={t('editProfile')}
               onPress={openEditProfile}
               style={styles.menuEditProfileButton}
             >
@@ -795,16 +799,24 @@ export function HomeScreen({ navigation }: Props) {
                 <Text style={styles.menuEditProfileIconText}>✎</Text>
               </View>
               <View style={styles.menuEditProfileCopy}>
-                <Text style={styles.menuEditProfileTitle}>Profili düzenle</Text>
+                <Text style={styles.menuEditProfileTitle}>{t('editProfile')}</Text>
                 <Text style={styles.menuEditProfileSubtitle}>
-                  Ad soyadını veya şifreni güncelle
+                  {t('editProfileDescription')}
                 </Text>
               </View>
               <Text style={styles.menuEditProfileArrow}>›</Text>
             </Pressable>
             <View style={styles.menuDivider} />
-            <Text style={styles.menuSectionTitle}>Görünüm</Text>
-            <ThemeSelector />
+            <View style={styles.preferencesRow}>
+              <View style={styles.preference}>
+                <Text style={styles.menuSectionTitle}>{t('theme')}</Text>
+                <ThemeSelector />
+              </View>
+              <View style={styles.preference}>
+                <Text style={styles.menuSectionTitle}>{t('language')}</Text>
+                <LanguageSelector />
+              </View>
+            </View>
             <Pressable
               accessibilityRole="button"
               onPress={requestLogout}
@@ -812,7 +824,7 @@ export function HomeScreen({ navigation }: Props) {
               style={styles.menuLogoutButton}
             >
               <Text style={styles.menuLogoutText}>
-                {isAuthLoading ? 'Çıkış yapılıyor...' : 'Çıkış yap'}
+                {isAuthLoading ? t('loggingOut') : t('logout')}
               </Text>
             </Pressable>
           </Pressable>
@@ -833,10 +845,10 @@ export function HomeScreen({ navigation }: Props) {
         >
           <Pressable style={styles.deleteConfirmation} onPress={() => {}}>
             <Text style={styles.deleteConfirmationTitle}>
-              Çıkış yapılsın mı?
+              {t('logoutTitle')}
             </Text>
             <Text style={styles.deleteConfirmationMessage}>
-              Hesabınızdan çıkış yapmak istediğinize emin misiniz?
+              {t('logoutMessage')}
             </Text>
             <View style={styles.deleteConfirmationActions}>
               <Pressable
@@ -844,7 +856,7 @@ export function HomeScreen({ navigation }: Props) {
                 onPress={() => setLogoutConfirmationVisible(false)}
                 style={styles.deleteCancelButton}
               >
-                <Text style={styles.deleteCancelText}>Vazgeç</Text>
+                <Text style={styles.deleteCancelText}>{t('cancel')}</Text>
               </Pressable>
               <Pressable
                 accessibilityRole="button"
