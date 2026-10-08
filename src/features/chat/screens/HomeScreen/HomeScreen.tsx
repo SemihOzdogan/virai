@@ -865,7 +865,7 @@ export function HomeScreen({ navigation }: Props) {
                 style={styles.deleteConfirmButton}
               >
                 <Text style={styles.deleteConfirmText}>
-                  {isAuthLoading ? 'Çıkış yapılıyor...' : 'Çıkış yap'}
+                  {isAuthLoading ? t('loggingOut') : t('logout')}
                 </Text>
               </Pressable>
             </View>

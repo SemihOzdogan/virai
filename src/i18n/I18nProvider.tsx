@@ -41,6 +41,7 @@ export function I18nProvider({ children }: React.PropsWithChildren) {
   const [preference, setPreference] = useState<LanguagePreference>('system');
   const hasChangedPreference = useRef(false);
   const isAuthenticated = useAuthStore(state => state.isAuthenticated);
+  const wasAuthenticated = useRef(isAuthenticated);
   const systemLanguage = getSystemLanguage();
 
   // Authentication screens must always match the device language. A saved
@@ -66,6 +67,17 @@ export function I18nProvider({ children }: React.PropsWithChildren) {
       isActive = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (wasAuthenticated.current && !isAuthenticated) {
+      hasChangedPreference.current = true;
+      setPreference('system');
+      AsyncStorage.setItem(storageKey, 'system').catch(error =>
+        console.warn('Dil tercihi sıfırlanamadı.', error),
+      );
+    }
+    wasAuthenticated.current = isAuthenticated;
+  }, [isAuthenticated]);
 
   const setLanguage = useCallback(async (nextPreference: LanguagePreference) => {
     hasChangedPreference.current = true;
