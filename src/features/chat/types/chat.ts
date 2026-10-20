@@ -17,4 +17,11 @@ export type ChatMessage = {
   status: 'complete' | 'failed';
   error?: string;
   provider?: 'gemini';
+  attachment?: ChatAttachment;
+};
+
+export type ChatAttachment = {
+  name: string;
+  mimeType: 'application/pdf' | 'text/plain';
+  size: number;
 };

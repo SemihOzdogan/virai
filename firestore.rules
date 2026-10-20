@@ -22,6 +22,16 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    function validAttachment(data) {
+      return data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 120
+        && data.mimeType in ['application/pdf', 'text/plain']
+        && data.size is int
+        && data.size > 0
+        && data.size <= 12582912;
+    }
+
     match /users/{userId}/conversations/{conversationId} {
       allow read: if isOwner(userId);
       allow create: if isOwner(userId)
@@ -78,7 +88,8 @@ service cloud.firestore {
             'sequence',
             'createdAt',
             'status',
-            'provider'
+            'provider',
+            'attachment'
           ])
           && request.resource.data.role in ['user', 'assistant']
           && request.resource.data.content is string
@@ -89,6 +100,8 @@ service cloud.firestore {
           && request.resource.data.createdAt == request.time
           && request.resource.data.status == 'complete'
           && request.resource.data.provider == 'gemini'
+          && (!request.resource.data.keys().hasAny(['attachment'])
+            || validAttachment(request.resource.data.attachment))
           && conversationAfterWrite().userId == userId
           && (
             (

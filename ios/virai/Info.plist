@@ -34,6 +34,8 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
+	<key>LSSupportsOpeningDocumentsInPlace</key>
+	<true/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
@@ -43,6 +45,8 @@
 	</dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Sesli mesajınızı yazıya çevirmek için mikrofona erişim gerekir.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Fotoğraf veya belge eklemek istediğinizde seçtiğiniz dosyaya erişebilmek için fotoğraf arşivinize erişim gerekir.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
 	<string>Sesli mesajınızı yazıya çevirmek için konuşma tanıma kullanılır.</string>
 	<key>NSSupportsLiveActivities</key>
@@ -70,6 +74,8 @@
 	<array>
 		<string>audio</string>
 	</array>
+	<key>UIFileSharingEnabled</key>
+	<true/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>
@@ -79,6 +85,7 @@
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationPortraitUpsideDown</string>
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>

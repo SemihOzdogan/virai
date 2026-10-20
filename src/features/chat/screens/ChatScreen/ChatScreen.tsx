@@ -24,6 +24,10 @@ import { useI18n } from '../../../../i18n';
 import { animationStyles, createStyles } from './ChatScreen.styles';
 import type { ChatMessage } from '../../types/chat';
 import type { RootStackParamList } from '../../../../types/navigation';
+import {
+  chooseDocument,
+  type SelectedDocument,
+} from '../../services/documentAttachment';
 
 type Props = StackScreenProps<RootStackParamList, 'Chat'>;
 type SpeechRecognitionApi = typeof import('react-native-speech-recognition-kit');
@@ -139,6 +143,8 @@ export function ChatScreen({ navigation, route }: Props) {
   const error = useChatStore(state => state.error);
   const clearError = useChatStore(state => state.clearError);
   const [draft, setDraft] = useState('');
+  const [document, setDocument] = useState<SelectedDocument | null>(null);
+  const [isPickingDocument, setIsPickingDocument] = useState(false);
   const [pendingMessage, setPendingMessage] = useState<{
     text: string;
     afterSequence: number;
@@ -332,8 +338,29 @@ export function ChatScreen({ navigation, route }: Props) {
         ]
       : messages;
 
+  const selectDocument = async () => {
+    if (isSending || isPickingDocument) {
+      return;
+    }
+
+    setVoiceError(null);
+    setIsPickingDocument(true);
+    try {
+      const selected = await chooseDocument();
+      if (selected) {
+        setDocument(selected);
+      }
+    } catch (caughtError) {
+      setVoiceError(
+        caughtError instanceof Error ? caughtError.message : 'Dosya seçilemedi.',
+      );
+    } finally {
+      setIsPickingDocument(false);
+    }
+  };
+
   const handleSend = async (messageText = draft) => {
-    const text = messageText.trim();
+    const text = messageText.trim() || (document ? `Bu belgeyi analiz et: ${document.name}` : '');
     if (!text || isSending || isLoadingMessages || !user?.id) {
       return;
     }
@@ -348,8 +375,11 @@ export function ChatScreen({ navigation, route }: Props) {
       setDraft('');
     }
     setPendingMessage({ text, afterSequence });
-    const sent = await sendMessage(user.id, conversationId, text, mode);
+    const sent = await sendMessage(user.id, conversationId, text, mode, document ?? undefined);
     setPendingMessage(null);
+    if (sent) {
+      setDocument(null);
+    }
     if (!sent && messageText === draft) {
       setDraft(text);
     }
@@ -454,6 +484,11 @@ export function ChatScreen({ navigation, route }: Props) {
                       ]}>
                       {message.content}
                     </Text>
+                    {message.attachment ? (
+                      <Text style={styles.attachmentLabel}>
+                        📎 {message.attachment.name} · {Math.ceil(message.attachment.size / 1024)} KB
+                      </Text>
+                    ) : null}
                     {message.role === 'assistant' ? (
                       <Pressable
                         accessibilityRole="button"
@@ -518,7 +553,34 @@ export function ChatScreen({ navigation, route }: Props) {
         {error ? <Text style={styles.error}>{error}</Text> : null}
         {voiceError ? <Text style={styles.voiceNotice}>ⓘ {voiceError}</Text> : null}
 
+        {document ? (
+          <View style={styles.selectedDocument}>
+            <Text numberOfLines={1} style={styles.selectedDocumentText}>
+              📎 {document.name} · {Math.ceil(document.size / 1024)} KB
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Ekli dosyayı kaldır"
+              onPress={() => setDocument(null)}
+              disabled={isSending}
+              style={styles.removeDocumentButton}>
+              <Text style={styles.removeDocumentText}>×</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         <View style={styles.composer}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="PDF veya TXT dosyası ekle"
+            onPress={selectDocument}
+            disabled={isSending || isPickingDocument || isListening}
+            style={[
+              styles.documentButton,
+              (isSending || isPickingDocument || isListening) && styles.sendButtonDisabled,
+            ]}>
+            <Text style={styles.documentButtonText}>{isPickingDocument ? '…' : '📎'}</Text>
+          </Pressable>
           <TextInput
             ref={input}
             value={draft}
@@ -553,7 +615,7 @@ export function ChatScreen({ navigation, route }: Props) {
             accessibilityLabel={t('sendMessage')}
             onPress={() => handleSend()}
             disabled={
-              !draft.trim() ||
+              (!draft.trim() && !document) ||
               isSending ||
               isLoadingMessages ||
               !user?.id ||
@@ -561,7 +623,7 @@ export function ChatScreen({ navigation, route }: Props) {
             }
             style={[
               styles.sendButton,
-              (!draft.trim() || isSending || isLoadingMessages || !user?.id || isListening) &&
+              ((!draft.trim() && !document) || isSending || isLoadingMessages || !user?.id || isListening) &&
                 styles.sendButtonDisabled,
             ]}>
             <Text style={styles.sendButtonText}>↑</Text>

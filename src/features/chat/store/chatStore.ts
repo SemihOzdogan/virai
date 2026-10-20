@@ -7,7 +7,7 @@ import {
   subscribeToConversations,
   subscribeToMessages,
 } from '../api/chatApi';
-import type { ChatMessage, ChatMode, Conversation } from '../types/chat';
+import type { ChatAttachment, ChatMessage, ChatMode, Conversation } from '../types/chat';
 
 type ChatState = {
   conversations: Conversation[];
@@ -23,6 +23,7 @@ type ChatState = {
     conversationId: string,
     text: string,
     mode?: ChatMode,
+    document?: ChatAttachment & { data: string },
   ) => Promise<boolean>;
   deleteConversation: (uid: string, conversationId: string) => Promise<boolean>;
   renameConversation: (
@@ -78,7 +79,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         })),
     );
   },
-  sendMessage: async (uid, conversationId, text, mode = 'general') => {
+  sendMessage: async (uid, conversationId, text, mode = 'general', document) => {
     if (get().sendingByConversation[conversationId]) {
       return false;
     }
@@ -95,6 +96,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         text,
         get().messagesByConversation[conversationId] ?? [],
         mode,
+        document,
       );
       set(state => ({
         sendingByConversation: { ...state.sendingByConversation, [conversationId]: false },
