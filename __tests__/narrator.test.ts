@@ -23,16 +23,16 @@ beforeEach(() => {
   jest.clearAllMocks();
   mockGenerate.mockReset();
 });
-test('retries malformed JSON once and returns the valid scene', async () => {
+test('uses the local scene after one malformed narrator response', async () => {
   mockGenerate
     .mockResolvedValueOnce(response('{'))
     .mockResolvedValueOnce(response(JSON.stringify(valid)));
   await expect(
     narrate({ version: 1, turns: [] }, 'Kapıyı aç'),
-  ).resolves.toEqual(valid);
-  expect(mockGenerate).toHaveBeenCalledTimes(2);
+  ).resolves.toMatchObject({ illustration: 'lobby' });
+  expect(mockGenerate).toHaveBeenCalledTimes(1);
 });
-test('continues with a local scene after two malformed responses', async () => {
+test('continues with a local scene after a malformed response', async () => {
   mockGenerate.mockResolvedValue(response('{'));
   await expect(
     narrate({ version: 1, turns: [] }, 'Kapıyı aç'),
@@ -40,7 +40,7 @@ test('continues with a local scene after two malformed responses', async () => {
     illustration: 'lobby',
     choices: expect.any(Array),
   });
-  expect(mockGenerate).toHaveBeenCalledTimes(2);
+  expect(mockGenerate).toHaveBeenCalledTimes(1);
 });
 test('continues with a local scene when the AI service is unavailable', async () => {
   mockGenerate.mockRejectedValue(new Error('quota exceeded'));

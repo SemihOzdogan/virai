@@ -51,6 +51,13 @@ export function sceneIllustration(scene: Scene): IllustrationName {
 }
 export type Turn = Scene & { action: string };
 export type Adventure = { version: 1; turns: Turn[] };
+export type AdventureEnding = 'rescue' | 'escape' | 'keeper';
+export type AdventurePath = {
+  ending: AdventureEnding;
+  compassion: number;
+  truth: number;
+  risk: number;
+};
 export const totalTurns = 15;
 export const opening: Scene = {
   illustration: 'lobby',
@@ -98,6 +105,52 @@ export function getStory(language: AdventureLanguage) {
   return language === 'en'
     ? englishStory
     : { chapters, characters, clues, opening };
+}
+
+/**
+ * Converts the player's decisions into a stable ending.  The AI narrator is
+ * given this path too, so a saved game and the local fallback tell the same
+ * kind of ending even when the network is unavailable.
+ */
+export function getAdventurePath(adventure: Adventure): AdventurePath {
+  let compassion = 0;
+  let truth = 0;
+  let risk = 0;
+
+  adventure.turns.forEach((turn, index) => {
+    const previousChoices =
+      index === 0 ? opening.choices : adventure.turns[index - 1].choices;
+    const choiceIndex = previousChoices.indexOf(turn.action);
+    if (choiceIndex === 0) {
+      compassion += 1;
+      return;
+    }
+    if (choiceIndex === 1) {
+      truth += 1;
+      return;
+    }
+    if (choiceIndex === 2) {
+      risk += 1;
+      return;
+    }
+
+    const action = turn.action.toLocaleLowerCase('tr-TR');
+    if (/mina|yardım|kurtar|elini|güven|help|rescue|trust/.test(action)) {
+      compassion += 1;
+    } else if (/dışarı|kaç|gerçek|mektup|polis|escape|truth|letter|outside/.test(action)) {
+      truth += 1;
+    } else {
+      risk += 1;
+    }
+  });
+
+  const ending: AdventureEnding =
+    compassion >= truth && compassion >= risk
+      ? 'rescue'
+      : truth >= risk
+        ? 'escape'
+        : 'keeper';
+  return { ending, compassion, truth, risk };
 }
 export function parseScene(raw: string, final: boolean): Scene {
   const value = JSON.parse(

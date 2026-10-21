@@ -4,6 +4,7 @@ import {
   restoreAdventure,
   totalTurns,
   sceneIllustration,
+  getAdventurePath,
 } from '../src/features/adventure/services/story';
 
 const scene = {
@@ -83,4 +84,21 @@ test('rejects incompatible or corrupt saves instead of silently overwriting prog
   ]) {
     expect(() => restoreAdventure(raw)).toThrow();
   }
+});
+
+test('turns a player’s selected choices into a persistent story path', () => {
+  const rescuePath = getAdventurePath({
+    version: 1,
+    turns: [
+      { ...scene, action: opening.choices[0] },
+      { ...scene, action: scene.choices[0] },
+    ],
+  });
+  const keeperPath = getAdventurePath({
+    version: 1,
+    turns: [{ ...scene, action: opening.choices[2] }],
+  });
+
+  expect(rescuePath).toMatchObject({ ending: 'rescue', compassion: 2 });
+  expect(keeperPath).toMatchObject({ ending: 'keeper', risk: 1 });
 });

@@ -26,6 +26,7 @@ import { useI18n } from '../../../../i18n';
 import { createStyles } from './AdventureScreen.styles';
 import {
   getStory,
+  getAdventurePath,
   restoreAdventure,
   totalTurns,
   type Adventure,
@@ -112,6 +113,17 @@ function AdventureGame({
       console.warn('Macera hatırlatıcısı güncellenemedi.', reminderError);
     });
   }, [adventure, loading, uid]);
+
+  useEffect(() => {
+    if (!busy) {
+      return;
+    }
+
+    const frame = requestAnimationFrame(() =>
+      scroll.current?.scrollToEnd({ animated: true }),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [busy]);
 
   const play = async (text: string) => {
     const action = text.trim();
@@ -205,6 +217,13 @@ function AdventureGame({
   const complete = count === totalTurns;
   const chapter = Math.min(4, Math.floor(count / 3));
   const scene = adventure?.turns[count - 1] ?? story.opening;
+  const path = adventure ? getAdventurePath(adventure) : null;
+  const endingTitle =
+    path?.ending === 'rescue'
+      ? t('endingRescue')
+      : path?.ending === 'escape'
+        ? t('endingEscape')
+        : t('endingKeeper');
   const share = async () => {
     try {
       await Share.share({
@@ -334,6 +353,19 @@ function AdventureGame({
                     </Text>
                   </View>
                 )}
+                {complete && path && (
+                  <View style={styles.endingCard}>
+                    <Text style={styles.label}>{t('yourEnding')}</Text>
+                    <Text style={styles.endingTitle}>{endingTitle}</Text>
+                    <Text style={styles.muted}>
+                      {t('endingDescription', {
+                        compassion: path.compassion,
+                        truth: path.truth,
+                        risk: path.risk,
+                      })}
+                    </Text>
+                  </View>
+                )}
                 {!complete && (
                   <>
                     <Text style={styles.section}>{t('whatNext')}</Text>
@@ -373,12 +405,6 @@ function AdventureGame({
                     </Pressable>
                   </>
                 )}
-                {busy && (
-                  <View style={styles.wait}>
-                    <ActivityIndicator color={colors.accent} />
-                    <Text style={styles.muted}>{t('writingStory')}</Text>
-                  </View>
-                )}
                 {complete && (
                   <Pressable
                     accessibilityRole="button"
@@ -408,6 +434,16 @@ function AdventureGame({
               </Text>
             )}
           </ScrollView>
+        )}
+        {busy && (
+          <View
+            accessibilityLabel={t('writingStory')}
+            accessibilityLiveRegion="polite"
+            style={styles.statusBanner}
+          >
+            <ActivityIndicator color={colors.onAccent} size="small" />
+            <Text style={styles.statusText}>{t('writingStory')}</Text>
+          </View>
         )}
       </KeyboardAvoidingView>
     </SafeAreaView>

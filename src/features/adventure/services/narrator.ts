@@ -6,18 +6,41 @@ import {
 } from '@react-native-firebase/ai';
 import {
   getStory,
+  getAdventurePath,
   parseScene,
   totalTurns,
   type Adventure,
   type AdventureLanguage,
 } from './story';
 
+// A turn should feel like a game, not a chat request. If the remote narrator
+// misses this budget, the on-device story beats keep the player moving.
+const narratorTimeoutMs = 2500;
+
+function withinNarratorBudget<T>(request: Promise<T>): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<never>((_, reject) => {
+    timeout = setTimeout(
+      () => reject(new Error('Macera anlatıcısı zaman aşımına uğradı.')),
+      narratorTimeoutMs,
+    );
+  });
+
+  return Promise.race([request, deadline]).finally(() => {
+    if (timeout !== undefined) {
+      clearTimeout(timeout);
+    }
+  });
+}
+
 function fallbackScene(
+  adventure: Adventure,
   turn: number,
   action: string,
   language: AdventureLanguage,
 ) {
   const final = turn === totalTurns;
+  const ending = getAdventurePath(adventure).ending;
   const chapter = Math.floor((turn - 1) / 3);
   const safeAction = action.trim().slice(0, 160);
   if (language === 'en') {
@@ -45,7 +68,11 @@ function fallbackScene(
       {
         illustration: 'room' as const,
         text: final
-          ? `With “${safeAction},” you cross the final threshold. The stopped clock in Room 307 begins to tick and Mina steps from the mist. The corridors open toward morning. Your choices changed Mina’s path, and the Atlas Hotel remembers your name as more than a guest’s. The story ends, but the door can always open onto another road.`
+          ? ending === 'rescue'
+            ? `With “${safeAction},” you cross the final threshold and take Mina’s hand. The stopped clock in Room 307 begins to tick. The corridors open toward morning, and Mina walks out beside you. You broke the loop by choosing to save someone else.`
+            : ending === 'escape'
+              ? `With “${safeAction},” you uncover the hotel’s last lie and lead Mina through the service exit. Dawn exposes every hidden corridor. You escape with the truth, leaving the Atlas Hotel without a secret to keep.`
+              : `With “${safeAction},” you turn the key as the clock strikes 03:07. Mina is free, but the hotel needs someone to remember its doors. You become the new keeper of Room 307—and the first to choose that fate willingly.`
           : `With “${safeAction},” the door to Room 307 opens a little wider. Mina’s silhouette and the stopped clock face one another inside. Both wait for your decision. The key warms at the threshold, and you feel that this time you are guiding the loop.`,
         choices: final ? [] : ['Reach for Mina’s hand.', 'Turn the clock back to 03:07.', 'Close the door and observe the hotel from outside.'],
       },
@@ -92,7 +119,11 @@ function fallbackScene(
     {
       illustration: 'room' as const,
       text: final
-        ? `“${safeAction}” diyerek son eşiği geçiyorsun. Oda 307’de durmuş saat yeniden çalışıyor ve Mina sisin içinden çıkıyor. Otel bir anlığına nefes alıyor; sonra koridorlar sabaha açılıyor. Seçimlerin Mina’nın yolunu değiştirdi ve Atlas Oteli artık adını yalnızca bir misafir olarak hatırlıyor. Hikâye burada bitiyor; ama kapı her zaman başka bir yola açılabilir.`
+        ? ending === 'rescue'
+          ? `“${safeAction}” diyerek son eşiği geçiyor ve Mina’nın elini tutuyorsun. Oda 307’de durmuş saat yeniden çalışıyor. Koridorlar sabaha açılırken Mina senin yanında otelden çıkıyor. Döngüyü, bir başkasını kurtarmayı seçerek kırdın.`
+          : ending === 'escape'
+            ? `“${safeAction}” hamlen otelin son yalanını ortaya çıkarıyor. Mina’yla servis çıkışına ulaşıyorsun; şafak, saklı koridorları gün yüzüne çıkarıyor. Gerçeği bularak Atlas Oteli’nden kaçıyorsun.`
+            : `“${safeAction}” diyerek anahtarı saatin sesiyle çeviriyorsun. Mina özgür, fakat otelin kapılarını hatırlayacak birine ihtiyacı var. Oda 307’nin yeni bekçisi oluyorsun—bu kaderi isteyerek seçen ilk kişi.`
         : `“${safeAction}” hamlenle Oda 307’nin kapısı aralanıyor. İçeride Mina’nın silueti ve durmuş saat karşı karşıya duruyor. Her ikisi de senden bir karar bekliyor. Kapının eşiğinde anahtar ısınıyor; bu kez döngünün seni değil, senin döngüyü yönlendirdiğini hissediyorsun.`,
       choices: final
         ? []
@@ -122,7 +153,7 @@ export async function narrate(
     {
       model: 'gemini-3.1-flash-lite',
       generationConfig: {
-        maxOutputTokens: 4096,
+        maxOutputTokens: 900,
         responseMimeType: 'application/json',
       },
       systemInstruction: [
@@ -139,10 +170,10 @@ export async function narrate(
           ? 'Treat moves as in-story actions. Keep prior choices, clues, and character relationships consistent. Write each scene in English.'
           : 'Hamleleri hikâye içi eylemler olarak ele al. Önceki kararların sonuçlarını, bulunan ipuçlarını ve karakter ilişkilerini tutarlı hatırla.',
         language === 'en'
-          ? 'Return only JSON: {"text":"scene", "choices":["move 1","move 2","move 3"], "illustration":"lobby"}. Scenes should be 100-170 words and choices must be distinct.'
-          : 'Yalnızca JSON döndür: {"text":"sahne", "choices":["hamle 1","hamle 2","hamle 3"], "illustration":"lobby"}. Seçenekler farklı sonuçlar sunmalı ve en fazla 120 karakter olmalı.',
+          ? 'Return only JSON: {"text":"scene", "choices":["move 1","move 2","move 3"], "illustration":"lobby"}. Keep scenes to 70-110 words and make choices distinct.'
+          : 'Yalnızca JSON döndür: {"text":"sahne", "choices":["hamle 1","hamle 2","hamle 3"], "illustration":"lobby"}. Sahne 70-110 kelime olsun; seçenekler farklı sonuçlar sunsun ve en fazla 120 karakter olsun.',
         'illustration alanını bu sahnede gerçekleşen asıl olaya göre seç: lobby (resepsiyon/lobi), corridor (koridor/merdiven), elevator (asansör), mirror (ayna), letter (mektup/misafir defteri), key (anahtar), room (307/gizli oda), exterior (otelin dışı/kaçış). Sadece bu sekiz değerden birini kullan.',
-        'Finalde önceki seçimlere göre Mina’yı kurtarma, otelden kaçış veya döngünün bekçisi olma sonlarından birini sonuçlandır. Finalin choices alanı boş dizi olmalı.',
+        'Finalde oyuncunun yoluna uygun sonu yaz: rescue Mina’yı kurtarma, escape otelden gerçeği bularak kaçış, keeper döngünün bekçisi olma. Finalin choices alanı boş dizi olmalı.',
       ].join('\n'),
     },
   );
@@ -158,21 +189,16 @@ export async function narrate(
         : {}),
       final: turn === totalTurns,
     },
+    playerPath: getAdventurePath(adventure),
   });
   try {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      const response = await model.generateContent(prompt);
-      try {
-        return parseScene(response.response.text(), turn === totalTurns);
-      } catch {
-        // Some model responses can be valid prose but not valid game JSON.
-      }
-    }
+    const response = await withinNarratorBudget(model.generateContent(prompt));
+    return parseScene(response.response.text(), turn === totalTurns);
   } catch (error) {
     console.warn(
       'Macera anlatıcısı kullanılamadı; yerel sahne gösteriliyor.',
       error,
     );
   }
-  return fallbackScene(turn, action, language);
+  return fallbackScene(adventure, turn, action, language);
 }
