@@ -2,6 +2,7 @@ import {
   EmailAuthProvider,
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
+  deleteUser,
   onAuthStateChanged,
   reauthenticateWithCredential,
   sendPasswordResetEmail,
@@ -14,6 +15,7 @@ import {
 } from '@firebase/auth';
 import type { Unsubscribe } from '@firebase/auth';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {
   getFirebaseAuth,
@@ -21,6 +23,8 @@ import {
   isFirebaseConfigured,
 } from '../../../config/firebase';
 import { getAuthSessionExpiresAt } from '../services/authSession';
+import { deleteAllChatConversations } from '../../chat/api/chatApi';
+import { cancelAdventureReminder } from '../../adventure/services/adventureReminder';
 import type {
   AppUser,
   LoginCredentials,
@@ -62,7 +66,7 @@ function toAuthError(error: unknown) {
     'auth/email-already-in-use': 'Bu e-posta adresi zaten kayıtlı.',
     'auth/weak-password': 'Şifre en az 6 karakter olmalıdır.',
     'auth/missing-password': 'Şifre alanı zorunludur.',
-    'auth/requires-recent-login': 'Şifrenizi değiştirmek için yeniden giriş yapmalısınız.',
+    'auth/requires-recent-login': 'Hesabınızı silmek için lütfen çıkış yapıp yeniden giriş yapın.',
     'auth/user-mismatch': 'Mevcut şifreniz doğrulanamadı.',
   };
 
@@ -226,6 +230,29 @@ export async function updateUserProfile({
 
     await updateProfile(user, { displayName: name.trim() });
     return toAppUser(user);
+  } catch (error) {
+    throw new Error(toAuthError(error));
+  }
+}
+
+export async function deleteFirebaseAccount() {
+  if (!isFirebaseConfigured()) {
+    throw new Error(
+      'Firebase yapılandırması eksik. src/config/firebase.ts dosyasındaki ayarları kontrol edin.',
+    );
+  }
+
+  const auth = getFirebaseAuth();
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error('Hesabınızı silmek için yeniden giriş yapmalısınız.');
+  }
+
+  try {
+    await deleteAllChatConversations(user.uid);
+    await AsyncStorage.removeItem(`virai-adventure-307-v1:${user.uid}`);
+    await cancelAdventureReminder(user.uid);
+    await deleteUser(user);
   } catch (error) {
     throw new Error(toAuthError(error));
   }

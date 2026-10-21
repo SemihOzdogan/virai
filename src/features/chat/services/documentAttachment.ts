@@ -1,3 +1,5 @@
+import ReactNativeBlobUtil from 'react-native-blob-util';
+
 export const MAX_DOCUMENT_BYTES = 12 * 1024 * 1024;
 
 export type SelectedDocument = {
@@ -26,25 +28,12 @@ function getMimeType(file: PickedFile): SelectedDocument['mimeType'] | null {
   return null;
 }
 
-function blobToBase64(blob: Blob) {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Dosya okunamadı.'));
-    reader.onloadend = () => {
-      const result = reader.result;
-      if (typeof result !== 'string') {
-        reject(new Error('Dosya okunamadı.'));
-        return;
-      }
-      const commaIndex = result.indexOf(',');
-      resolve(commaIndex >= 0 ? result.slice(commaIndex + 1) : result);
-    };
-    reader.readAsDataURL(blob);
-  });
+function localPath(uri: string) {
+  return uri.startsWith('file://') ? decodeURIComponent(uri.slice(7)) : uri;
 }
 
 export async function chooseDocument(): Promise<SelectedDocument | null> {
-  const { errorCodes, isErrorWithCode, pick, types } = await import(
+  const { errorCodes, isErrorWithCode, keepLocalCopy, pick, types } = await import(
     '@react-native-documents/picker'
   );
 
@@ -70,25 +59,37 @@ export async function chooseDocument(): Promise<SelectedDocument | null> {
     throw new Error('Dosya en fazla 12 MB olabilir.');
   }
 
-  let response: Response;
+  let localUri: string;
   try {
-    response = await fetch(file.uri);
+    const [copy] = await keepLocalCopy({
+      destination: 'cachesDirectory',
+      files: [{ uri: file.uri, fileName: file.name }],
+    });
+    if (!copy || copy.status !== 'success') {
+      throw new Error('copy failed');
+    }
+    localUri = copy.localUri;
   } catch {
     throw new Error('Dosya cihaza aktarılamadı. Lütfen tekrar deneyin.');
   }
-  if (!response.ok) {
+
+  let data: string;
+  try {
+    data = await ReactNativeBlobUtil.fs.readFile(localPath(localUri), 'base64');
+  } catch {
     throw new Error('Dosya okunamadı. Lütfen tekrar deneyin.');
   }
-
-  const blob = await response.blob();
-  if (blob.size === 0 || blob.size > MAX_DOCUMENT_BYTES) {
+  if (!data) {
+    throw new Error('Dosya okunamadı. Lütfen tekrar deneyin.');
+  }
+  if (file.size > MAX_DOCUMENT_BYTES) {
     throw new Error('Dosya en fazla 12 MB olabilir.');
   }
 
   return {
     name: file.name.slice(0, 120),
     mimeType,
-    size: blob.size,
-    data: await blobToBase64(blob),
+    size: file.size,
+    data,
   };
 }

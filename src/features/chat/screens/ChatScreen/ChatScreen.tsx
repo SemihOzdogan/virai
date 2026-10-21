@@ -54,12 +54,12 @@ function getVoiceNotice(error: unknown, fallback: string) {
   return fallback;
 }
 
-function formatMessageTime(date: Date | null) {
+function formatMessageTime(date: Date | null, language: 'tr' | 'en') {
   if (!date) {
     return null;
   }
 
-  return new Intl.DateTimeFormat('tr-TR', {
+  return new Intl.DateTimeFormat(language === 'tr' ? 'tr-TR' : 'en-US', {
     hour: '2-digit',
     minute: '2-digit',
   }).format(date);
@@ -67,6 +67,7 @@ function formatMessageTime(date: Date | null) {
 
 function TypingIndicator() {
   const { colors } = useTheme();
+  const { t } = useI18n();
   const dots = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)])
     .current;
 
@@ -95,7 +96,7 @@ function TypingIndicator() {
   }, [dots]);
 
   return (
-    <View style={animationStyles.typingDots} accessibilityLabel="Yanıt hazırlanıyor">
+    <View style={animationStyles.typingDots} accessibilityLabel={t('responsePreparing')}>
       {dots.map((dot, index) => (
         <Animated.View
           key={index}
@@ -125,7 +126,7 @@ function TypingIndicator() {
 
 export function ChatScreen({ navigation, route }: Props) {
   const { colors, isDark } = useTheme();
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { conversationId, title, mode = 'general' } = route.params;
   const user = useAuthStore(state => state.user);
@@ -139,6 +140,9 @@ export function ChatScreen({ navigation, route }: Props) {
   const sendMessage = useChatStore(state => state.sendMessage);
   const isSending = useChatStore(
     state => state.sendingByConversation[conversationId] ?? false,
+  );
+  const streamingResponse = useChatStore(
+    state => state.streamingResponseByConversation[conversationId] ?? '',
   );
   const error = useChatStore(state => state.error);
   const clearError = useChatStore(state => state.clearError);
@@ -335,8 +339,30 @@ export function ChatScreen({ navigation, route }: Props) {
             createdAt: new Date(),
             status: 'complete' as const,
           },
-        ]
+      ]
       : messages;
+  const streamedResponseIsPersisted = visibleMessages.some(
+    message =>
+      message.role === 'assistant' &&
+      (
+        message.content.trim() === streamingResponse.trim() ||
+        (pendingMessage !== null &&
+          message.sequence > pendingMessage.afterSequence)
+      ),
+  );
+  const renderedMessages = streamingResponse && !streamedResponseIsPersisted
+    ? [
+        ...visibleMessages,
+        {
+          id: 'streaming-assistant-message',
+          role: 'assistant' as const,
+          content: streamingResponse,
+          sequence: Number.MAX_SAFE_INTEGER,
+          createdAt: new Date(),
+          status: 'complete' as const,
+        },
+      ]
+    : visibleMessages;
 
   const selectDocument = async () => {
     if (isSending || isPickingDocument) {
@@ -427,7 +453,7 @@ export function ChatScreen({ navigation, route }: Props) {
             <View style={styles.loading}>
               <ActivityIndicator color={colors.accent} />
             </View>
-          ) : visibleMessages.length === 0 ? (
+          ) : renderedMessages.length === 0 ? (
             <View style={styles.welcome}>
               <View style={styles.welcomeMark}>
                 <Text style={styles.welcomeMarkText}>✦</Text>
@@ -454,7 +480,7 @@ export function ChatScreen({ navigation, route }: Props) {
               </View>
             </View>
           ) : (
-            visibleMessages.map(message => (
+            renderedMessages.map(message => (
               <View
                 key={message.id}
                 style={[
@@ -529,16 +555,16 @@ export function ChatScreen({ navigation, route }: Props) {
                       </>
                     ) : null}
                   </View>
-                  {formatMessageTime(message.createdAt) ? (
+                  {formatMessageTime(message.createdAt, language) ? (
                     <Text style={styles.messageTime}>
-                      {formatMessageTime(message.createdAt)}
+                      {formatMessageTime(message.createdAt, language)}
                     </Text>
                   ) : null}
                 </View>
               </View>
             ))
           )}
-          {isSending ? (
+          {isSending && !streamingResponse ? (
             <View style={styles.typingRow}>
               <View style={styles.assistantMark}>
                 <Text style={styles.assistantMarkText}>✦</Text>
@@ -560,7 +586,7 @@ export function ChatScreen({ navigation, route }: Props) {
             </Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Ekli dosyayı kaldır"
+              accessibilityLabel={t('removeAttachedDocument')}
               onPress={() => setDocument(null)}
               disabled={isSending}
               style={styles.removeDocumentButton}>
@@ -572,7 +598,7 @@ export function ChatScreen({ navigation, route }: Props) {
         <View style={styles.composer}>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="PDF veya TXT dosyası ekle"
+            accessibilityLabel={t('attachDocument')}
             onPress={selectDocument}
             disabled={isSending || isPickingDocument || isListening}
             style={[

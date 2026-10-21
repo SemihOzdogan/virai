@@ -5,9 +5,6 @@ import {
   GoogleAIBackend,
 } from '@react-native-firebase/ai';
 import {
-  chapters,
-  characters,
-  clues,
   getStory,
   parseScene,
   totalTurns,

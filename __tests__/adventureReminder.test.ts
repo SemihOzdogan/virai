@@ -24,7 +24,7 @@ beforeEach(() => {
 
 afterEach(() => jest.useRealTimers());
 
-test('schedules one daily 02:55 reminder for an unfinished story', async () => {
+test('schedules four daily reminders for an unfinished story', async () => {
   await expect(scheduleAdventureReminder('user-1')).resolves.toBe(true);
   expect(notificationApi.createChannel).toHaveBeenCalledWith(
     expect.objectContaining({ id: 'adventure-reminders' }),
@@ -35,10 +35,11 @@ test('schedules one daily 02:55 reminder for an unfinished story', async () => {
   expect(notificationApi.createTriggerNotification).toHaveBeenCalledWith(
     expect.objectContaining({ title: 'Oda 307 seni bekliyor' }),
     expect.objectContaining({
-      timestamp: new Date('2026-10-08T02:55:00').getTime(),
+      timestamp: new Date('2026-10-08T10:00:00').getTime(),
       repeatFrequency: 1,
     }),
   );
+  expect(notificationApi.createTriggerNotification).toHaveBeenCalledTimes(4);
 });
 
 test('does not schedule when notification permission is denied', async () => {

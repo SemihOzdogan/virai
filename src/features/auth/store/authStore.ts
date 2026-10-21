@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import {
+  deleteFirebaseAccount,
   loginWithGoogle,
   loginWithEmailAndPassword,
   logoutFromFirebase,
@@ -30,6 +31,7 @@ type AuthState = {
   loginWithGoogle: () => Promise<boolean>;
   requestPasswordReset: (email: string) => Promise<boolean>;
   updateProfile: (credentials: UpdateProfileCredentials) => Promise<boolean>;
+  deleteAccount: () => Promise<boolean>;
   logout: () => Promise<boolean>;
   clearError: () => void;
 };
@@ -155,6 +157,27 @@ export const useAuthStore = create<AuthState>((set) => ({
         isLoading: false,
         error:
           error instanceof Error ? error.message : 'Profil güncellenirken bir hata oluştu.',
+      });
+      return false;
+    }
+  },
+  deleteAccount: async () => {
+    set({ isLoading: true, error: null });
+
+    try {
+      await deleteFirebaseAccount();
+      set({
+        user: null,
+        isAuthenticated: false,
+        isLoading: false,
+        error: null,
+      });
+      return true;
+    } catch (error) {
+      set({
+        isLoading: false,
+        error:
+          error instanceof Error ? error.message : 'Hesap silinirken bir hata oluştu.',
       });
       return false;
     }

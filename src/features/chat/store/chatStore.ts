@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 
 import {
+  deleteAllChatConversations,
   deleteChatConversation,
   renameChatConversation,
   sendChatMessage,
@@ -15,6 +16,7 @@ type ChatState = {
   isLoadingConversations: boolean;
   loadingMessagesByConversation: Record<string, boolean>;
   sendingByConversation: Record<string, boolean>;
+  streamingResponseByConversation: Record<string, string>;
   error: string | null;
   subscribeToConversations: (uid: string) => () => void;
   subscribeToMessages: (uid: string, conversationId: string) => () => void;
@@ -26,6 +28,7 @@ type ChatState = {
     document?: ChatAttachment & { data: string },
   ) => Promise<boolean>;
   deleteConversation: (uid: string, conversationId: string) => Promise<boolean>;
+  deleteAllConversations: (uid: string) => Promise<boolean>;
   renameConversation: (
     uid: string,
     conversationId: string,
@@ -40,6 +43,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   isLoadingConversations: true,
   loadingMessagesByConversation: {},
   sendingByConversation: {},
+  streamingResponseByConversation: {},
   error: null,
   subscribeToConversations: uid =>
     subscribeToConversations(
@@ -59,16 +63,36 @@ export const useChatStore = create<ChatState>((set, get) => ({
       uid,
       conversationId,
       messages =>
-        set(state => ({
-          messagesByConversation: {
-            ...state.messagesByConversation,
-            [conversationId]: messages,
-          },
-          loadingMessagesByConversation: {
-            ...state.loadingMessagesByConversation,
-            [conversationId]: false,
-          },
-        })),
+        set(state => {
+          const streamedResponse = state.streamingResponseByConversation[conversationId];
+          const hasPersistedStream =
+            typeof streamedResponse === 'string' &&
+            streamedResponse.length > 0 &&
+            messages.some(
+              message =>
+                message.role === 'assistant' &&
+                message.content.trim() === streamedResponse.trim(),
+            );
+          const streamingResponseByConversation = hasPersistedStream
+            ? Object.fromEntries(
+                Object.entries(state.streamingResponseByConversation).filter(
+                  ([id]) => id !== conversationId,
+                ),
+              )
+            : state.streamingResponseByConversation;
+
+          return {
+            messagesByConversation: {
+              ...state.messagesByConversation,
+              [conversationId]: messages,
+            },
+            streamingResponseByConversation,
+            loadingMessagesByConversation: {
+              ...state.loadingMessagesByConversation,
+              [conversationId]: false,
+            },
+          };
+        }),
       error =>
         set(state => ({
           error,
@@ -86,6 +110,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     set(state => ({
       sendingByConversation: { ...state.sendingByConversation, [conversationId]: true },
+      streamingResponseByConversation: {
+        ...state.streamingResponseByConversation,
+        [conversationId]: '',
+      },
       error: null,
     }));
 
@@ -97,6 +125,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
         get().messagesByConversation[conversationId] ?? [],
         mode,
         document,
+        content =>
+          set(state => ({
+            streamingResponseByConversation: {
+              ...state.streamingResponseByConversation,
+              [conversationId]: content,
+            },
+          })),
       );
       set(state => ({
         sendingByConversation: { ...state.sendingByConversation, [conversationId]: false },
@@ -105,6 +140,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } catch (error) {
       set(state => ({
         sendingByConversation: { ...state.sendingByConversation, [conversationId]: false },
+        streamingResponseByConversation: Object.fromEntries(
+          Object.entries(state.streamingResponseByConversation).filter(
+            ([id]) => id !== conversationId,
+          ),
+        ),
         error: error instanceof Error ? error.message : 'Mesaj gönderilemedi.',
       }));
       return false;
@@ -119,6 +159,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Sohbet silinemedi.',
+      });
+      return false;
+    }
+  },
+  deleteAllConversations: async uid => {
+    set({ error: null });
+
+    try {
+      await deleteAllChatConversations(uid);
+      return true;
+    } catch (error) {
+      set({
+        error:
+          error instanceof Error ? error.message : 'Sohbetler silinemedi.',
       });
       return false;
     }

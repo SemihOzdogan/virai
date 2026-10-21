@@ -236,6 +236,7 @@ export function HomeScreen({ navigation }: Props) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const user = useAuthStore(state => state.user);
   const logout = useAuthStore(state => state.logout);
+  const deleteAccount = useAuthStore(state => state.deleteAccount);
   const updateProfile = useAuthStore(state => state.updateProfile);
   const isAuthLoading = useAuthStore(state => state.isLoading);
   const conversations = useChatStore(state => state.conversations);
@@ -248,6 +249,9 @@ export function HomeScreen({ navigation }: Props) {
   const error = useChatStore(state => state.error);
   const clearError = useChatStore(state => state.clearError);
   const deleteConversation = useChatStore(state => state.deleteConversation);
+  const deleteAllConversations = useChatStore(
+    state => state.deleteAllConversations,
+  );
   const renameConversation = useChatStore(state => state.renameConversation);
   const isPlayerVisible = useSpeechStore(
     state => state.status !== 'idle' || state.error !== null,
@@ -255,6 +259,7 @@ export function HomeScreen({ navigation }: Props) {
   const [isProfileMenuVisible, setProfileMenuVisible] = useState(false);
   const [isLogoutConfirmationVisible, setLogoutConfirmationVisible] =
     useState(false);
+  const [isDeleteAccountVisible, setDeleteAccountVisible] = useState(false);
   const [isEditProfileVisible, setEditProfileVisible] = useState(false);
   const [profileName, setProfileName] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
@@ -268,6 +273,9 @@ export function HomeScreen({ navigation }: Props) {
     useState<Conversation | null>(null);
   const [renameTitle, setRenameTitle] = useState('');
   const [isRenaming, setIsRenaming] = useState(false);
+  const [isDeleteAllConfirmationVisible, setDeleteAllConfirmationVisible] =
+    useState(false);
+  const [isDeletingAllChats, setIsDeletingAllChats] = useState(false);
 
   useEffect(() => {
     if (!user?.id) {
@@ -317,6 +325,25 @@ export function HomeScreen({ navigation }: Props) {
   const requestLogout = () => {
     setProfileMenuVisible(false);
     setLogoutConfirmationVisible(true);
+  };
+  const requestAccountDeletion = () => {
+    clearError();
+    setProfileMenuVisible(false);
+    setDeleteAccountVisible(true);
+  };
+  const closeAccountDeletion = () => {
+    if (isAuthLoading) {
+      return;
+    }
+
+    setDeleteAccountVisible(false);
+    clearError();
+  };
+  const confirmAccountDeletion = async () => {
+    const deleted = await deleteAccount();
+    if (deleted) {
+      setDeleteAccountVisible(false);
+    }
   };
   const openEditProfile = () => {
     clearError();
@@ -390,6 +417,18 @@ export function HomeScreen({ navigation }: Props) {
     user?.id
       ? deleteConversation(user.id, conversationId)
       : Promise.resolve(false);
+  const confirmDeleteAllConversations = async () => {
+    if (!user?.id || isDeletingAllChats) {
+      return;
+    }
+
+    setIsDeletingAllChats(true);
+    const deleted = await deleteAllConversations(user.id);
+    setIsDeletingAllChats(false);
+    if (deleted) {
+      setDeleteAllConfirmationVisible(false);
+    }
+  };
 
   const openRenameDialog = (conversation: Conversation) => {
     clearError();
@@ -528,6 +567,17 @@ export function HomeScreen({ navigation }: Props) {
         <View style={styles.listHeader}>
           <Text style={styles.listTitle}>{t('pastChats')}</Text>
           <Text style={styles.listCount}>{conversations.length}</Text>
+          <View style={styles.listHeaderSpacer} />
+          {conversations.length > 0 ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('deleteAllChats')}
+              onPress={() => setDeleteAllConfirmationVisible(true)}
+              style={styles.deleteAllChatsButton}
+            >
+              <Text style={styles.deleteAllChatsText}>{t('deleteAllChats')}</Text>
+            </Pressable>
+          ) : null}
         </View>
 
         {conversations.length > 0 ? (
@@ -573,6 +623,50 @@ export function HomeScreen({ navigation }: Props) {
           />
         )}
       </View>
+      <Modal
+        animationType="fade"
+        transparent
+        visible={isDeleteAllConfirmationVisible}
+        onRequestClose={() => setDeleteAllConfirmationVisible(false)}
+        statusBarTranslucent
+      >
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('close')}
+          onPress={() => !isDeletingAllChats && setDeleteAllConfirmationVisible(false)}
+          style={styles.modalBackdrop}
+        >
+          <Pressable style={styles.deleteConfirmation} onPress={() => {}}>
+            <Text style={styles.deleteConfirmationTitle}>
+              {t('deleteAllChatsTitle')}
+            </Text>
+            <Text style={styles.deleteConfirmationMessage}>
+              {t('deleteAllChatsMessage')}
+            </Text>
+            {error ? <Text style={styles.error}>{error}</Text> : null}
+            <View style={styles.deleteConfirmationActions}>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setDeleteAllConfirmationVisible(false)}
+                disabled={isDeletingAllChats}
+                style={styles.deleteCancelButton}
+              >
+                <Text style={styles.deleteCancelText}>{t('cancel')}</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                onPress={confirmDeleteAllConversations}
+                disabled={isDeletingAllChats}
+                style={styles.deleteConfirmButton}
+              >
+                <Text style={styles.deleteConfirmText}>
+                  {isDeletingAllChats ? t('deletingAllChats') : t('deleteAllChats')}
+                </Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
       <Modal
         animationType="fade"
         transparent
@@ -809,11 +903,9 @@ export function HomeScreen({ navigation }: Props) {
             <View style={styles.menuDivider} />
             <View style={styles.preferencesRow}>
               <View style={styles.preference}>
-                <Text style={styles.menuSectionTitle}>{t('theme')}</Text>
                 <ThemeSelector />
               </View>
-              <View style={styles.preference}>
-                <Text style={styles.menuSectionTitle}>{t('language')}</Text>
+              <View style={[styles.preference, styles.preferenceSpaced]}>
                 <LanguageSelector />
               </View>
             </View>
@@ -827,8 +919,68 @@ export function HomeScreen({ navigation }: Props) {
                 {isAuthLoading ? t('loggingOut') : t('logout')}
               </Text>
             </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('deleteAccount')}
+              onPress={requestAccountDeletion}
+              disabled={isAuthLoading}
+              style={styles.menuDeleteAccountButton}
+            >
+              <Text style={styles.menuDeleteAccountText}>
+                {t('deleteAccount')}
+              </Text>
+            </Pressable>
           </Pressable>
         </Pressable>
+      </Modal>
+      <Modal
+        animationType="fade"
+        transparent
+        visible={isDeleteAccountVisible}
+        onRequestClose={closeAccountDeletion}
+        statusBarTranslucent
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={styles.modalKeyboardAvoidingView}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('close')}
+            onPress={closeAccountDeletion}
+            style={styles.modalBackdrop}
+          >
+            <Pressable style={styles.deleteConfirmation} onPress={() => {}}>
+              <Text style={styles.deleteConfirmationTitle}>
+                {t('deleteAccountTitle')}
+              </Text>
+              <Text style={styles.deleteConfirmationMessage}>
+                {t('deleteAccountMessage')}
+              </Text>
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+              <View style={styles.deleteConfirmationActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={closeAccountDeletion}
+                  disabled={isAuthLoading}
+                  style={styles.deleteCancelButton}
+                >
+                  <Text style={styles.deleteCancelText}>{t('cancel')}</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={confirmAccountDeletion}
+                  disabled={isAuthLoading}
+                  style={styles.deleteConfirmButton}
+                >
+                  <Text style={styles.deleteConfirmText}>
+                    {isAuthLoading ? t('deletingAccount') : t('deleteAccount')}
+                  </Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          </Pressable>
+        </KeyboardAvoidingView>
       </Modal>
       <Modal
         animationType="fade"

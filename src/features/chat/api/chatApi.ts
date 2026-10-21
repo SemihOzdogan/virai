@@ -152,6 +152,21 @@ export async function deleteChatConversation(uid: string, conversationId: string
   await deleteDoc(getConversationRef(uid, conversationId));
 }
 
+export async function deleteAllChatConversations(uid: string) {
+  const conversationsRef = collection(firestore(), 'users', uid, 'conversations');
+
+  while (true) {
+    const conversations = await getDocs(query(conversationsRef, limit(50)));
+    if (conversations.empty) {
+      return;
+    }
+
+    for (const conversation of conversations.docs) {
+      await deleteChatConversation(uid, conversation.id);
+    }
+  }
+}
+
 export async function renameChatConversation(
   uid: string,
   conversationId: string,
@@ -261,6 +276,7 @@ export async function sendChatMessage(
   previousMessages: ChatMessage[],
   mode: ChatMode = 'general',
   document?: ChatAttachment & { data: string },
+  onPartialResponse?: (content: string) => void,
 ) {
   const trimmedText = text.trim();
   if (!trimmedText || trimmedText.length > maxMessageLength) {
@@ -290,6 +306,7 @@ export async function sendChatMessage(
   const requestStartedAt = Timestamp.now();
   let sequence = 0;
   let shouldGenerateTitle = false;
+  let provisionalTitle = '';
 
   await runTransaction(firestore(), async transaction => {
     const conversationSnapshot = await transaction.get(conversationRef);
@@ -298,6 +315,7 @@ export async function sendChatMessage(
     const needsTitle =
       !conversationSnapshot.exists() || isGenericConversationTitle(currentTitle);
     shouldGenerateTitle = needsTitle && !isGreetingMessage(trimmedText);
+    provisionalTitle = currentTitle.trim() || trimmedText.slice(0, 60);
 
     if (conversation && conversation.userId !== uid) {
       throw new Error('Bu sohbete erişim izniniz yok.');
@@ -340,7 +358,7 @@ export async function sendChatMessage(
       {
         userId: uid,
         title: shouldGenerateTitle
-          ? currentTitle.trim() || trimmedText.slice(0, 60)
+          ? provisionalTitle
           : 'Yeni sohbet',
         provider: 'gemini',
         mode,
@@ -415,39 +433,17 @@ export async function sendChatMessage(
     // Logic's document flow and avoids carrying unrelated chat history alongside
     // a large inline file.
     const response = document
-      ? await model.generateContent(messageParts)
-      : await model.startChat({ history }).sendMessage(messageParts);
-    const reply = response.response.text().trim();
+      ? await model.generateContentStream(messageParts)
+      : await model.startChat({ history }).sendMessageStream(messageParts);
+    let reply = '';
+    for await (const chunk of response.stream) {
+      reply += chunk.text();
+      onPartialResponse?.(reply);
+    }
+    reply = reply.trim();
 
     if (!reply) {
       throw new Error('Boş bir yanıt alındı. Lütfen tekrar deneyin.');
-    }
-
-    let generatedTitle: string | null = null;
-    if (shouldGenerateTitle) {
-      try {
-        const titleModel = getGenerativeModel(ai, {
-          model: chatModel,
-          generationConfig: { maxOutputTokens: 48, temperature: 0.3 },
-        });
-        const titleResponse = await titleModel.generateContent(
-          [
-            'İlk kullanıcı mesajı ve ilk asistan yanıtının asıl konusunu adlandıran kısa, somut bir sohbet başlığı üret.',
-            'Sorudaki kişi, yer ve konu gibi ayırt edici ayrıntıları koru. “Yardımcı olma talebi”, “genel sohbet” veya benzeri belirsiz başlıklar yazma.',
-            'Kullanıcıyla aynı dilde, en fazla 60 karakter yaz. Yalnızca başlığı döndür; açıklama, tırnak veya başlık etiketi ekleme.',
-            'Örnek: Esenler hava durumu hakkında bir soru için “Esenler Hava Durumu” yaz; “Yardımcı olma talebi” yazma.',
-            `Kullanıcı mesajı: ${trimmedText.slice(0, 1200)}`,
-            `Asistan yanıtı: ${reply.slice(0, 1200)}`,
-          ].join('\n\n'),
-        );
-        const title = normalizeConversationTitle(titleResponse.response.text());
-        generatedTitle =
-          title && !isGenericConversationTitle(title)
-            ? title
-            : getConversationTitleFallback(trimmedText) || null;
-      } catch (titleError) {
-        console.warn('Sohbet başlığı oluşturulamadı; ilk mesaj başlığı korunuyor.', titleError);
-      }
     }
 
     await runTransaction(firestore(), async transaction => {
@@ -472,7 +468,6 @@ export async function sendChatMessage(
         provider: 'gemini',
       });
       transaction.update(conversationRef, {
-        ...(shouldGenerateTitle && generatedTitle ? { title: generatedTitle } : {}),
         nextSequence: sequence + 2,
         isGenerating: false,
         generationStartedAt: null,
@@ -480,6 +475,51 @@ export async function sendChatMessage(
         updatedAt: serverTimestamp(),
       });
     });
+
+    if (shouldGenerateTitle) {
+      (async () => {
+        try {
+          const titleModel = getGenerativeModel(ai, {
+            model: chatModel,
+            generationConfig: { maxOutputTokens: 48, temperature: 0.3 },
+          });
+          const titleResponse = await titleModel.generateContent(
+            [
+              'İlk kullanıcı mesajı ve ilk asistan yanıtının asıl konusunu adlandıran kısa, somut bir sohbet başlığı üret.',
+              'Sorudaki kişi, yer ve konu gibi ayırt edici ayrıntıları koru. “Yardımcı olma talebi”, “genel sohbet” veya benzeri belirsiz başlıklar yazma.',
+              'Kullanıcıyla aynı dilde, en fazla 60 karakter yaz. Yalnızca başlığı döndür; açıklama, tırnak veya başlık etiketi ekleme.',
+              `Kullanıcı mesajı: ${trimmedText.slice(0, 1200)}`,
+              `Asistan yanıtı: ${reply.slice(0, 1200)}`,
+            ].join('\n\n'),
+          );
+          const title = normalizeConversationTitle(titleResponse.response.text());
+          const generatedTitle =
+            title && !isGenericConversationTitle(title)
+              ? title
+              : getConversationTitleFallback(trimmedText);
+
+          if (!generatedTitle) {
+            return;
+          }
+
+          await runTransaction(firestore(), async transaction => {
+            const snapshot = await transaction.get(conversationRef);
+            if (
+              snapshot.exists() &&
+              snapshot.data().userId === uid &&
+              snapshot.data().title === provisionalTitle
+            ) {
+              transaction.update(conversationRef, {
+                title: generatedTitle,
+                updatedAt: serverTimestamp(),
+              });
+            }
+          });
+        } catch (titleError) {
+          console.warn('Sohbet başlığı arka planda oluşturulamadı.', titleError);
+        }
+      })();
+    }
   } catch (error) {
     try {
       await runTransaction(firestore(), async transaction => {

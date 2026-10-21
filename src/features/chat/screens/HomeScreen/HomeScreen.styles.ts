@@ -108,6 +108,7 @@ export function createStyles(colors: AppTheme['colors']) {
       marginBottom: 10,
       gap: 9,
     },
+    listHeaderSpacer: { flex: 1 },
     listTitle: { color: colors.text, fontSize: 16, fontWeight: '700' },
     listCount: {
       color: colors.textSecondary,
@@ -118,6 +119,14 @@ export function createStyles(colors: AppTheme['colors']) {
       paddingVertical: 2,
       fontSize: 12,
     },
+    deleteAllChatsButton: {
+      alignItems: 'center',
+      backgroundColor: 'rgba(217, 67, 85, 0.12)',
+      borderRadius: 10,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+    },
+    deleteAllChatsText: { color: '#D94355', fontSize: 12, fontWeight: '700' },
     listContent: { paddingBottom: 10 },
     searchInput: {
       color: colors.text,
@@ -382,24 +391,19 @@ export function createStyles(colors: AppTheme['colors']) {
       backgroundColor: colors.border,
       marginVertical: 18,
     },
-    menuSectionTitle: {
-      color: colors.textSecondary,
-      fontSize: 13,
-      fontWeight: '700',
-      marginBottom: 10,
-    },
     preferencesRow: {
       backgroundColor: colors.surfaceRaised,
       borderColor: colors.border,
       borderRadius: 18,
       borderWidth: 1,
-      flexDirection: 'row',
-      justifyContent: 'space-between',
       padding: 12,
       width: '100%',
     },
     preference: {
-      alignItems: 'flex-start',
+      width: '100%',
+    },
+    preferenceSpaced: {
+      marginTop: 10,
     },
     menuEditProfileButton: {
       flexDirection: 'row',
@@ -430,6 +434,14 @@ export function createStyles(colors: AppTheme['colors']) {
       backgroundColor: colors.accentSoft,
     },
     menuLogoutText: { color: colors.accent, fontSize: 14, fontWeight: '700' },
+    menuDeleteAccountButton: {
+      alignItems: 'center',
+      marginTop: 10,
+      paddingVertical: 13,
+      borderRadius: 14,
+      backgroundColor: '#D94355',
+    },
+    menuDeleteAccountText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
     profileEditorDescription: {
       color: colors.textSecondary,
       fontSize: 13,
