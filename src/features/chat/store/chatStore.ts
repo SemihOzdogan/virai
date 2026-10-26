@@ -8,7 +8,12 @@ import {
   subscribeToConversations,
   subscribeToMessages,
 } from '../api/chatApi';
-import type { ChatAttachment, ChatMessage, ChatMode, Conversation } from '../types/chat';
+import type {
+  ChatAttachment,
+  ChatMessage,
+  ChatMode,
+  Conversation,
+} from '../types/chat';
 
 type ChatState = {
   conversations: Conversation[];
@@ -26,6 +31,7 @@ type ChatState = {
     text: string,
     mode?: ChatMode,
     document?: ChatAttachment & { data: string },
+    attachments?: Array<ChatAttachment & { data: string }>,
   ) => Promise<boolean>;
   deleteConversation: (uid: string, conversationId: string) => Promise<boolean>;
   deleteAllConversations: (uid: string) => Promise<boolean>;
@@ -48,7 +54,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   subscribeToConversations: uid =>
     subscribeToConversations(
       uid,
-      conversations => set({ conversations, isLoadingConversations: false, error: null }),
+      conversations =>
+        set({ conversations, isLoadingConversations: false, error: null }),
       error => set({ error, isLoadingConversations: false }),
     ),
   subscribeToMessages: (uid, conversationId) => {
@@ -64,7 +71,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
       conversationId,
       messages =>
         set(state => {
-          const streamedResponse = state.streamingResponseByConversation[conversationId];
+          const streamedResponse =
+            state.streamingResponseByConversation[conversationId];
           const hasPersistedStream =
             typeof streamedResponse === 'string' &&
             streamedResponse.length > 0 &&
@@ -103,13 +111,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
         })),
     );
   },
-  sendMessage: async (uid, conversationId, text, mode = 'general', document) => {
+  sendMessage: async (
+    uid,
+    conversationId,
+    text,
+    mode = 'general',
+    document,
+    attachments,
+  ) => {
     if (get().sendingByConversation[conversationId]) {
       return false;
     }
 
     set(state => ({
-      sendingByConversation: { ...state.sendingByConversation, [conversationId]: true },
+      sendingByConversation: {
+        ...state.sendingByConversation,
+        [conversationId]: true,
+      },
       streamingResponseByConversation: {
         ...state.streamingResponseByConversation,
         [conversationId]: '',
@@ -124,7 +142,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         text,
         get().messagesByConversation[conversationId] ?? [],
         mode,
-        document,
+        attachments ?? (document ? [document] : undefined),
         content =>
           set(state => ({
             streamingResponseByConversation: {
@@ -134,12 +152,18 @@ export const useChatStore = create<ChatState>((set, get) => ({
           })),
       );
       set(state => ({
-        sendingByConversation: { ...state.sendingByConversation, [conversationId]: false },
+        sendingByConversation: {
+          ...state.sendingByConversation,
+          [conversationId]: false,
+        },
       }));
       return true;
     } catch (error) {
       set(state => ({
-        sendingByConversation: { ...state.sendingByConversation, [conversationId]: false },
+        sendingByConversation: {
+          ...state.sendingByConversation,
+          [conversationId]: false,
+        },
         streamingResponseByConversation: Object.fromEntries(
           Object.entries(state.streamingResponseByConversation).filter(
             ([id]) => id !== conversationId,
@@ -171,8 +195,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return true;
     } catch (error) {
       set({
-        error:
-          error instanceof Error ? error.message : 'Sohbetler silinemedi.',
+        error: error instanceof Error ? error.message : 'Sohbetler silinemedi.',
       });
       return false;
     }
@@ -185,7 +208,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       return true;
     } catch (error) {
       set({
-        error: error instanceof Error ? error.message : 'Sohbet başlığı değiştirilemedi.',
+        error:
+          error instanceof Error
+            ? error.message
+            : 'Sohbet başlığı değiştirilemedi.',
       });
       return false;
     }

@@ -8,6 +8,7 @@ import ReactTestRenderer from 'react-test-renderer';
 jest.mock('../src/features/auth/api/authApi', () => ({
   loginWithEmailAndPassword: jest.fn(),
   loginWithGoogle: jest.fn(),
+  loginWithApple: jest.fn(),
   logoutFromFirebase: jest.fn(),
   observeFirebaseAuth: jest.fn(() => jest.fn()),
   registerWithEmailAndPassword: jest.fn(),

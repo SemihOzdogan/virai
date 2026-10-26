@@ -7,6 +7,7 @@ import { RegisterScreen } from '../features/auth/screens/RegisterScreen/Register
 import { HomeScreen } from '../features/chat/screens/HomeScreen/HomeScreen';
 import { AdventureScreen } from '../features/adventure/screens/AdventureScreen/AdventureScreen';
 import { ChatScreen } from '../features/chat/screens/ChatScreen/ChatScreen';
+import { JobApplicationScreen } from '../features/chat/screens/JobApplicationScreen/JobApplicationScreen';
 import { useAuthStore } from '../features/auth/store/authStore';
 import { useTheme } from '../theme';
 import { styles } from './AppNavigator.styles';
@@ -36,11 +37,16 @@ export function AppNavigator() {
       screenOptions={{
         headerShown: false,
         cardStyle: { backgroundColor: colors.background },
-      }}>
+      }}
+    >
       {isAuthenticated ? (
         <Stack.Group>
           <Stack.Screen name="Home" component={HomeScreen} />
           <Stack.Screen name="Adventure" component={AdventureScreen} />
+          <Stack.Screen
+            name="JobApplication"
+            component={JobApplicationScreen}
+          />
           <Stack.Screen name="Chat" component={ChatScreen} />
         </Stack.Group>
       ) : (

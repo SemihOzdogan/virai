@@ -2,6 +2,7 @@ import { create } from 'zustand';
 
 import {
   deleteFirebaseAccount,
+  loginWithApple,
   loginWithGoogle,
   loginWithEmailAndPassword,
   logoutFromFirebase,
@@ -24,11 +25,13 @@ type AuthState = {
   isLoading: boolean;
   isEmailLoginLoading: boolean;
   isGoogleLoginLoading: boolean;
+  isAppleLoginLoading: boolean;
   error: string | null;
   initialize: () => () => void;
   login: (credentials: LoginCredentials) => Promise<boolean>;
   register: (credentials: RegisterCredentials) => Promise<boolean>;
   loginWithGoogle: () => Promise<boolean>;
+  loginWithApple: () => Promise<boolean>;
   requestPasswordReset: (email: string) => Promise<boolean>;
   updateProfile: (credentials: UpdateProfileCredentials) => Promise<boolean>;
   deleteAccount: () => Promise<boolean>;
@@ -43,6 +46,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   isLoading: false,
   isEmailLoginLoading: false,
   isGoogleLoginLoading: false,
+  isAppleLoginLoading: false,
   error: null,
   initialize: () =>
     observeFirebaseAuth(
@@ -125,6 +129,34 @@ export const useAuthStore = create<AuthState>((set) => ({
         isLoading: false,
         isGoogleLoginLoading: false,
         error: error instanceof Error ? error.message : 'Google ile giriş yapılamadı.',
+      });
+      return false;
+    }
+  },
+  loginWithApple: async () => {
+    set({ isLoading: true, isAppleLoginLoading: true, error: null });
+
+    try {
+      const user = await loginWithApple();
+
+      if (!user) {
+        set({ isLoading: false, isAppleLoginLoading: false });
+        return false;
+      }
+
+      set({
+        user,
+        isAuthenticated: true,
+        isLoading: false,
+        isAppleLoginLoading: false,
+        error: null,
+      });
+      return true;
+    } catch (error) {
+      set({
+        isLoading: false,
+        isAppleLoginLoading: false,
+        error: error instanceof Error ? error.message : 'Apple ile giriş yapılamadı.',
       });
       return false;
     }

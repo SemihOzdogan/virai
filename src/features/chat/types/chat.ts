@@ -1,4 +1,4 @@
-export type ChatMode = 'general' | 'interview';
+export type ChatMode = 'general' | 'interview' | 'jobApplication';
 
 export type Conversation = {
   id: string;
@@ -22,6 +22,11 @@ export type ChatMessage = {
 
 export type ChatAttachment = {
   name: string;
-  mimeType: 'application/pdf' | 'text/plain';
+  mimeType:
+    | 'application/pdf'
+    | 'text/plain'
+    | 'image/jpeg'
+    | 'image/png'
+    | 'image/webp';
   size: number;
 };

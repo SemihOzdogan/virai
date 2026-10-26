@@ -1,17 +1,25 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import {
   Animated,
   ActivityIndicator,
+  FlatList,
   Keyboard,
   KeyboardAvoidingView,
+  Modal,
   Platform,
   PermissionsAndroid,
   Pressable,
-  ScrollView,
   StatusBar,
   Text,
   TextInput,
   View,
+  type ListRenderItemInfo,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
@@ -30,17 +38,24 @@ import {
 } from '../../services/documentAttachment';
 
 type Props = StackScreenProps<RootStackParamList, 'Chat'>;
-type SpeechRecognitionApi = typeof import('react-native-speech-recognition-kit');
+type SpeechRecognitionApi =
+  typeof import('react-native-speech-recognition-kit');
 
 const EMPTY_MESSAGES: ChatMessage[] = [];
 function getVoiceNotice(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message : '';
   const normalizedMessage = message.toLocaleLowerCase('tr-TR');
 
-  if (normalizedMessage.includes('cancel') || normalizedMessage.includes('iptal')) {
+  if (
+    normalizedMessage.includes('cancel') ||
+    normalizedMessage.includes('iptal')
+  ) {
     return null;
   }
-  if (normalizedMessage.includes('permission') || normalizedMessage.includes('izin')) {
+  if (
+    normalizedMessage.includes('permission') ||
+    normalizedMessage.includes('izin')
+  ) {
     return 'Sesli giriş için mikrofon ve konuşma tanıma izinlerini açın.';
   }
   if (
@@ -65,11 +80,55 @@ function formatMessageTime(date: Date | null, language: 'tr' | 'en') {
   }).format(date);
 }
 
+function cleanMessageLine(line: string) {
+  return line
+    .replace(/\*\*/g, '')
+    .replace(/^#{1,6}\s*/, '')
+    .trim();
+}
+
+function isMessageHeading(line: string) {
+  return (
+    /^.{1,70}:$/.test(line) ||
+    /^(dikkat|uyum özeti|güçlü eşleşmeler|geliştirilecek noktalar|mülakat hazırlığı|7 günlük plan)$/i.test(
+      line,
+    )
+  );
+}
+
+type JobMatchResult = { score: number; summary: string };
+
+function getJobMatchResult(content: string): JobMatchResult | null {
+  const scoreMatch = content.match(
+    /(?:uyum(?:\s+puan[ıi])?|uygunluk(?:\s+puan[ıi])?)\s*[:\-]?\s*(\d{1,3})\s*\/\s*100/i,
+  );
+  const score = Number(scoreMatch?.[1]);
+  if (!Number.isFinite(score) || score < 0 || score > 100) return null;
+
+  const lines = content.split(/\r?\n/).map(line =>
+    cleanMessageLine(line)
+      .replace(/^[-*•]\s*/, '')
+      .trim(),
+  );
+  const summaryStart = lines.findIndex(line => /^uyum özeti\s*:?$/i.test(line));
+  const summary = lines
+    .slice(summaryStart >= 0 ? summaryStart + 1 : 0)
+    .find(
+      line =>
+        line && !isMessageHeading(line) && !/\b\d{1,3}\s*\/\s*100\b/.test(line),
+    );
+
+  return { score, summary: summary ?? '' };
+}
+
 function TypingIndicator() {
   const { colors } = useTheme();
   const { t } = useI18n();
-  const dots = useRef([new Animated.Value(0), new Animated.Value(0), new Animated.Value(0)])
-    .current;
+  const dots = useRef([
+    new Animated.Value(0),
+    new Animated.Value(0),
+    new Animated.Value(0),
+  ]).current;
 
   useEffect(() => {
     const animations = dots.map((dot, index) =>
@@ -96,7 +155,10 @@ function TypingIndicator() {
   }, [dots]);
 
   return (
-    <View style={animationStyles.typingDots} accessibilityLabel={t('responsePreparing')}>
+    <View
+      style={animationStyles.typingDots}
+      accessibilityLabel={t('responsePreparing')}
+    >
       {dots.map((dot, index) => (
         <Animated.View
           key={index}
@@ -128,7 +190,14 @@ export function ChatScreen({ navigation, route }: Props) {
   const { colors, isDark } = useTheme();
   const { language, t } = useI18n();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { conversationId, title, mode = 'general' } = route.params;
+  const {
+    conversationId,
+    title,
+    mode = 'general',
+    autoFocus = false,
+    initialMessage,
+    initialAttachments,
+  } = route.params;
   const user = useAuthStore(state => state.user);
   const subscribeToMessages = useChatStore(state => state.subscribeToMessages);
   const messages = useChatStore(
@@ -156,6 +225,9 @@ export function ChatScreen({ navigation, route }: Props) {
   const [isListening, setIsListening] = useState(false);
   const [isStartingListening, setIsStartingListening] = useState(false);
   const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [jobMatchResult, setJobMatchResult] = useState<JobMatchResult | null>(
+    null,
+  );
   const speechModule = useRef<SpeechRecognitionApi | null>(null);
   const speechSubscriptions = useRef<{ remove: () => void }[]>([]);
   const voiceDraftBase = useRef('');
@@ -169,9 +241,13 @@ export function ChatScreen({ navigation, route }: Props) {
     state => state.status !== 'idle' || state.error !== null,
   );
   const input = useRef<React.ElementRef<typeof TextInput>>(null);
-  const scrollView = useRef<React.ElementRef<typeof ScrollView>>(null);
+  const hasSentInitialMessage = useRef(false);
+  const shownJobMatchMessageIds = useRef(new Set<string>());
+  const messageList = useRef<FlatList<ChatMessage>>(null);
   const scrollToLatest = useCallback(() => {
-    requestAnimationFrame(() => scrollView.current?.scrollToEnd({ animated: true }));
+    requestAnimationFrame(() =>
+      messageList.current?.scrollToEnd({ animated: true }),
+    );
   }, []);
 
   useEffect(() => {
@@ -199,14 +275,69 @@ export function ChatScreen({ navigation, route }: Props) {
   }, [conversationId, subscribeToMessages, user?.id]);
 
   useEffect(() => {
-    const keyboardSubscription = Keyboard.addListener('keyboardDidShow', scrollToLatest);
+    if (
+      !user?.id ||
+      !initialMessage ||
+      hasSentInitialMessage.current ||
+      isLoadingMessages
+    ) {
+      return;
+    }
+
+    hasSentInitialMessage.current = true;
+    sendMessage(
+      user.id,
+      conversationId,
+      initialMessage,
+      mode,
+      undefined,
+      initialAttachments,
+    );
+  }, [
+    conversationId,
+    initialAttachments,
+    initialMessage,
+    isLoadingMessages,
+    mode,
+    sendMessage,
+    user?.id,
+  ]);
+
+  useEffect(() => {
+    const keyboardSubscription = Keyboard.addListener(
+      'keyboardDidShow',
+      scrollToLatest,
+    );
     return () => keyboardSubscription.remove();
   }, [scrollToLatest]);
 
   useEffect(() => {
+    if (mode !== 'jobApplication' || isSending || streamingResponse) return;
+
+    const resultMessage = [...messages]
+      .reverse()
+      .find(
+        message =>
+          message.role === 'assistant' &&
+          message.status === 'complete' &&
+          !shownJobMatchMessageIds.current.has(message.id) &&
+          getJobMatchResult(message.content),
+      );
+    if (!resultMessage) return;
+
+    const result = getJobMatchResult(resultMessage.content);
+    if (result) {
+      shownJobMatchMessageIds.current.add(resultMessage.id);
+      setJobMatchResult(result);
+    }
+  }, [isSending, messages, mode, streamingResponse]);
+
+  useEffect(() => {
     return () => {
       const module = speechModule.current;
-      speechSubscriptions.current.forEach(subscription => subscription.remove());
+      speechSubscriptions.current.forEach(subscription =>
+        subscription.remove(),
+      );
       speechSubscriptions.current = [];
       if (module) {
         try {
@@ -225,10 +356,18 @@ export function ChatScreen({ navigation, route }: Props) {
       const module = await import('react-native-speech-recognition-kit');
       const { addEventListener, speechRecogntionEvents } = module;
       speechSubscriptions.current = [
-        addEventListener(speechRecogntionEvents.PARTIAL_RESULTS, onSpeechTranscript),
+        addEventListener(
+          speechRecogntionEvents.PARTIAL_RESULTS,
+          onSpeechTranscript,
+        ),
         addEventListener(speechRecogntionEvents.RESULTS, onSpeechTranscript),
-        addEventListener(speechRecogntionEvents.END, () => setIsListening(false)),
-        addEventListener(speechRecogntionEvents.ERROR, onSpeechRecognitionError),
+        addEventListener(speechRecogntionEvents.END, () =>
+          setIsListening(false),
+        ),
+        addEventListener(
+          speechRecogntionEvents.ERROR,
+          onSpeechRecognitionError,
+        ),
       ];
       speechModule.current = module;
     }
@@ -258,7 +397,9 @@ export function ChatScreen({ navigation, route }: Props) {
       return;
     }
 
-    setVoiceError(getVoiceNotice(new Error(message), 'Ses tanınamadı. Tekrar deneyin.'));
+    setVoiceError(
+      getVoiceNotice(new Error(message), 'Ses tanınamadı. Tekrar deneyin.'),
+    );
   };
 
   const toggleVoiceInput = async () => {
@@ -266,7 +407,12 @@ export function ChatScreen({ navigation, route }: Props) {
       try {
         await speechModule.current?.stopListening();
       } catch (caughtError) {
-        setVoiceError(getVoiceNotice(caughtError, 'Sesli giriş durdurulamadı. Tekrar deneyin.'));
+        setVoiceError(
+          getVoiceNotice(
+            caughtError,
+            'Sesli giriş durdurulamadı. Tekrar deneyin.',
+          ),
+        );
       }
       setIsListening(false);
       return;
@@ -300,7 +446,12 @@ export function ChatScreen({ navigation, route }: Props) {
       await module.startListening();
       setIsListening(true);
     } catch (caughtError) {
-      setVoiceError(getVoiceNotice(caughtError, 'Sesli giriş başlatılamadı. Tekrar deneyin.'));
+      setVoiceError(
+        getVoiceNotice(
+          caughtError,
+          'Sesli giriş başlatılamadı. Tekrar deneyin.',
+        ),
+      );
     } finally {
       setIsStartingListening(false);
     }
@@ -339,30 +490,29 @@ export function ChatScreen({ navigation, route }: Props) {
             createdAt: new Date(),
             status: 'complete' as const,
           },
-      ]
+        ]
       : messages;
   const streamedResponseIsPersisted = visibleMessages.some(
     message =>
       message.role === 'assistant' &&
-      (
-        message.content.trim() === streamingResponse.trim() ||
+      (message.content.trim() === streamingResponse.trim() ||
         (pendingMessage !== null &&
-          message.sequence > pendingMessage.afterSequence)
-      ),
+          message.sequence > pendingMessage.afterSequence)),
   );
-  const renderedMessages = streamingResponse && !streamedResponseIsPersisted
-    ? [
-        ...visibleMessages,
-        {
-          id: 'streaming-assistant-message',
-          role: 'assistant' as const,
-          content: streamingResponse,
-          sequence: Number.MAX_SAFE_INTEGER,
-          createdAt: new Date(),
-          status: 'complete' as const,
-        },
-      ]
-    : visibleMessages;
+  const renderedMessages =
+    streamingResponse && !streamedResponseIsPersisted
+      ? [
+          ...visibleMessages,
+          {
+            id: 'streaming-assistant-message',
+            role: 'assistant' as const,
+            content: streamingResponse,
+            sequence: Number.MAX_SAFE_INTEGER,
+            createdAt: new Date(),
+            status: 'complete' as const,
+          },
+        ]
+      : visibleMessages;
 
   const selectDocument = async () => {
     if (isSending || isPickingDocument) {
@@ -378,7 +528,9 @@ export function ChatScreen({ navigation, route }: Props) {
       }
     } catch (caughtError) {
       setVoiceError(
-        caughtError instanceof Error ? caughtError.message : 'Dosya seçilemedi.',
+        caughtError instanceof Error
+          ? caughtError.message
+          : 'Dosya seçilemedi.',
       );
     } finally {
       setIsPickingDocument(false);
@@ -386,7 +538,9 @@ export function ChatScreen({ navigation, route }: Props) {
   };
 
   const handleSend = async (messageText = draft) => {
-    const text = messageText.trim() || (document ? `Bu belgeyi analiz et: ${document.name}` : '');
+    const text =
+      messageText.trim() ||
+      (document ? `Bu belgeyi analiz et: ${document.name}` : '');
     if (!text || isSending || isLoadingMessages || !user?.id) {
       return;
     }
@@ -401,7 +555,13 @@ export function ChatScreen({ navigation, route }: Props) {
       setDraft('');
     }
     setPendingMessage({ text, afterSequence });
-    const sent = await sendMessage(user.id, conversationId, text, mode, document ?? undefined);
+    const sent = await sendMessage(
+      user.id,
+      conversationId,
+      text,
+      mode,
+      document ?? undefined,
+    );
     setPendingMessage(null);
     if (sent) {
       setDocument(null);
@@ -412,252 +572,399 @@ export function ChatScreen({ navigation, route }: Props) {
   };
 
   const isInterview = mode === 'interview';
-  const displayTitle = title?.trim() || (isInterview ? t('interviewSimulation') : t('newChat'));
+  const isJobApplication = mode === 'jobApplication';
+  const jobMatchTone =
+    (jobMatchResult?.score ?? 0) >= 75
+      ? styles.jobMatchGood
+      : (jobMatchResult?.score ?? 0) >= 50
+      ? styles.jobMatchMedium
+      : styles.jobMatchLow;
+  const jobMatchLabel =
+    (jobMatchResult?.score ?? 0) >= 75
+      ? t('jobMatchStrong')
+      : (jobMatchResult?.score ?? 0) >= 50
+      ? t('jobMatchPartial')
+      : t('jobMatchLow');
+  const displayTitle =
+    title?.trim() ||
+    (isInterview
+      ? t('interviewSimulation')
+      : isJobApplication
+      ? t('jobApplicationPackage')
+      : t('newChat'));
   const starterPrompts = isInterview
-    ? [t('interviewPromptOne'), t('interviewPromptTwo'), t('interviewPromptThree')]
+    ? [
+        t('interviewPromptOne'),
+        t('interviewPromptTwo'),
+        t('interviewPromptThree'),
+      ]
     : [t('starterPromptOne'), t('starterPromptTwo'), t('starterPromptThree')];
+  const renderMessage = ({
+    item: message,
+  }: ListRenderItemInfo<ChatMessage>) => (
+    <View
+      style={[
+        styles.messageRow,
+        message.role === 'user' && styles.userMessageRow,
+      ]}
+    >
+      {message.role === 'assistant' ? (
+        <View style={styles.assistantMark}>
+          <Text style={styles.assistantMarkText}>AI</Text>
+        </View>
+      ) : null}
+      <View
+        style={[
+          styles.messageContent,
+          message.role === 'user' && styles.userMessageContent,
+        ]}
+      >
+        <View
+          style={[
+            styles.messageBubble,
+            message.role === 'user'
+              ? styles.userBubble
+              : styles.assistantBubble,
+            message.status === 'failed' && styles.failedBubble,
+          ]}
+        >
+          <View style={styles.messageBody}>
+            {message.content.split(/\r?\n/).map((line, index) => {
+              const isListItem = /^\s*(?:[-*•]|\d+[.)])\s+/.test(line);
+              const text = cleanMessageLine(
+                isListItem
+                  ? line.replace(/^\s*(?:[-*•]|\d+[.)])\s+/, '')
+                  : line,
+              );
+              const isHeading = !isListItem && isMessageHeading(text);
+              const textStyle = [
+                styles.messageText,
+                message.role === 'user' && styles.userMessageText,
+                isHeading && styles.messageHeading,
+              ];
+
+              if (!text)
+                return (
+                  <View
+                    key={`${message.id}-${index}`}
+                    style={styles.messageSpacer}
+                  />
+                );
+
+              return isListItem ? (
+                <View
+                  key={`${message.id}-${index}`}
+                  style={styles.messageListItem}
+                >
+                  <Text
+                    style={[
+                      styles.messageBullet,
+                      message.role === 'user' && styles.userMessageText,
+                    ]}
+                  >
+                    •
+                  </Text>
+                  <Text style={[...textStyle, styles.messageListText]}>
+                    {text}
+                  </Text>
+                </View>
+              ) : (
+                <Text key={`${message.id}-${index}`} style={textStyle}>
+                  {text}
+                </Text>
+              );
+            })}
+          </View>
+          {message.attachment ? (
+            <Text style={styles.attachmentLabel}>
+              📎 {message.attachment.name} ·{' '}
+              {Math.ceil(message.attachment.size / 1024)} KB
+            </Text>
+          ) : null}
+          {message.role === 'assistant' ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                speechStatus !== 'idle' &&
+                speechConversationId === conversationId &&
+                speechMessageId === message.id
+                  ? t('stopReading')
+                  : t('listenToAnswer')
+              }
+              onPress={() => toggleSpeech(message)}
+              style={styles.speechButton}
+            >
+              <Text style={styles.speechButtonText}>
+                {speechStatus !== 'idle' &&
+                speechConversationId === conversationId &&
+                speechMessageId === message.id
+                  ? `■ ${t('stop')}`
+                  : `▶ ${t('listen')}`}
+              </Text>
+            </Pressable>
+          ) : null}
+          {message.status === 'failed' ? (
+            <>
+              <Text style={styles.failedLabel}>
+                {message.error ?? error ?? t('answerFailed')}
+              </Text>
+              {message.role === 'user' ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => handleSend(message.content)}
+                  disabled={isSending || isLoadingMessages}
+                  style={styles.retryButton}
+                >
+                  <Text style={styles.retryButtonText}>
+                    {isSending ? t('retrying') : t('retry')}
+                  </Text>
+                </Pressable>
+              ) : null}
+            </>
+          ) : null}
+        </View>
+        {formatMessageTime(message.createdAt, language) ? (
+          <Text style={styles.messageTime}>
+            {formatMessageTime(message.createdAt, language)}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={isPlayerVisible ? ['bottom'] : ['top', 'bottom']}>
+    <SafeAreaView
+      style={styles.safeArea}
+      edges={isPlayerVisible ? ['bottom'] : ['top', 'bottom']}
+    >
+      <Modal
+        transparent
+        animationType="fade"
+        visible={jobMatchResult !== null}
+        onRequestClose={() => setJobMatchResult(null)}
+      >
+        <View style={styles.jobMatchOverlay}>
+          <View style={styles.jobMatchModal}>
+            <Text style={styles.jobMatchEyebrow}>{t('jobMatchEyebrow')}</Text>
+            <View style={[styles.jobMatchScore, jobMatchTone]}>
+              <Text style={styles.jobMatchScoreText}>
+                {jobMatchResult?.score}/100
+              </Text>
+            </View>
+            <Text style={styles.jobMatchTitle}>{jobMatchLabel}</Text>
+            <Text style={styles.jobMatchDescription}>
+              {jobMatchResult?.summary || t('jobMatchFallback')}
+            </Text>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('jobMatchViewAnalysis')}
+              onPress={() => setJobMatchResult(null)}
+              style={styles.jobMatchButton}
+            >
+              <Text style={styles.jobMatchButtonText}>
+                {t('jobMatchViewAnalysis')}
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <KeyboardAvoidingView
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 6 : 0}>
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 6 : 0}
+      >
         <View style={styles.header}>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('back')}
             onPress={() => navigation.goBack()}
-            style={styles.backButton}>
+            style={styles.backButton}
+          >
             <Text style={styles.backText}>‹</Text>
           </Pressable>
           <View style={styles.headerTitleWrap}>
-            <Text numberOfLines={1} style={styles.headerTitle}>{displayTitle}</Text>
-            <Text style={styles.headerSubtitle}>{isInterview ? t('interviewCoach') : t('aiAssistantLabel')}</Text>
+            <Text numberOfLines={1} style={styles.headerTitle}>
+              {displayTitle}
+            </Text>
+            <Text style={styles.headerSubtitle}>
+              {isInterview
+                ? t('interviewCoach')
+                : isJobApplication
+                ? t('jobApplicationCoach')
+                : t('aiAssistantLabel')}
+            </Text>
           </View>
           <View style={styles.headerMark}>
             <Text style={styles.headerMarkText}>✦</Text>
           </View>
         </View>
 
-        <ScrollView
-          ref={scrollView}
+        <FlatList
+          ref={messageList}
           style={styles.messages}
           contentContainerStyle={styles.messagesContent}
+          data={renderedMessages}
+          renderItem={renderMessage}
+          keyExtractor={message => message.id}
+          extraData={isSending}
           onContentSizeChange={scrollToLatest}
           onLayout={scrollToLatest}
           keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}>
-          {isLoadingMessages ? (
-            <View style={styles.loading}>
-              <ActivityIndicator color={colors.accent} />
-            </View>
-          ) : renderedMessages.length === 0 ? (
-            <View style={styles.welcome}>
-              <View style={styles.welcomeMark}>
-                <Text style={styles.welcomeMarkText}>✦</Text>
+          showsVerticalScrollIndicator={false}
+          ListEmptyComponent={
+            isLoadingMessages ? (
+              <View style={styles.loading}>
+                <ActivityIndicator color={colors.accent} />
               </View>
-              <Text style={styles.welcomeTitle}>
-                {isInterview ? t('readyForInterview') : t('howCanIHelp')}
-              </Text>
-              <Text style={styles.welcomeText}>
-                {isInterview
-                  ? t('interviewWelcome')
-                  : t('chatWelcome')}
-              </Text>
-              <View style={styles.starterPrompts}>
-                {starterPrompts.map(prompt => (
-                  <Pressable
-                    key={prompt}
-                    accessibilityRole="button"
-                    onPress={() => handleSend(prompt)}
-                    disabled={isSending}
-                    style={styles.starterPrompt}>
-                    <Text style={styles.starterPromptText}>{prompt}</Text>
-                  </Pressable>
-                ))}
-              </View>
-            </View>
-          ) : (
-            renderedMessages.map(message => (
-              <View
-                key={message.id}
-                style={[
-                  styles.messageRow,
-                  message.role === 'user' && styles.userMessageRow,
-                ]}>
-                {message.role === 'assistant' ? (
-                  <View style={styles.assistantMark}>
-                    <Text style={styles.assistantMarkText}>✦</Text>
-                  </View>
-                ) : null}
-                <View
-                  style={[
-                    styles.messageContent,
-                    message.role === 'user' && styles.userMessageContent,
-                  ]}>
-                  <View
-                    style={[
-                      styles.messageBubble,
-                      message.role === 'user' ? styles.userBubble : styles.assistantBubble,
-                      message.status === 'failed' && styles.failedBubble,
-                    ]}>
-                    <Text
-                      style={[
-                        styles.messageText,
-                        message.role === 'user' && styles.userMessageText,
-                      ]}>
-                      {message.content}
-                    </Text>
-                    {message.attachment ? (
-                      <Text style={styles.attachmentLabel}>
-                        📎 {message.attachment.name} · {Math.ceil(message.attachment.size / 1024)} KB
-                      </Text>
-                    ) : null}
-                    {message.role === 'assistant' ? (
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={
-                          speechStatus !== 'idle' &&
-                          speechConversationId === conversationId &&
-                          speechMessageId === message.id
-                            ? t('stopReading')
-                            : t('listenToAnswer')
-                        }
-                        onPress={() => toggleSpeech(message)}
-                        style={styles.speechButton}>
-                        <Text style={styles.speechButtonText}>
-                          {speechStatus !== 'idle' &&
-                          speechConversationId === conversationId &&
-                          speechMessageId === message.id
-                            ? `■ ${t('stop')}`
-                            : `▶ ${t('listen')}`}
-                        </Text>
-                      </Pressable>
-                    ) : null}
-                    {message.status === 'failed' ? (
-                      <>
-                        <Text style={styles.failedLabel}>
-                          {message.error ?? error ?? t('answerFailed')}
-                        </Text>
-                        {message.role === 'user' ? (
-                          <Pressable
-                            accessibilityRole="button"
-                            onPress={() => handleSend(message.content)}
-                            disabled={isSending || isLoadingMessages}
-                            style={styles.retryButton}>
-                            <Text style={styles.retryButtonText}>
-                              {isSending ? t('retrying') : t('retry')}
-                            </Text>
-                          </Pressable>
-                        ) : null}
-                      </>
-                    ) : null}
-                  </View>
-                  {formatMessageTime(message.createdAt, language) ? (
-                    <Text style={styles.messageTime}>
-                      {formatMessageTime(message.createdAt, language)}
-                    </Text>
-                  ) : null}
+            ) : (
+              <View style={styles.welcome}>
+                <View style={styles.welcomeMark}>
+                  <Text style={styles.welcomeMarkText}>✦</Text>
+                </View>
+                <Text style={styles.welcomeTitle}>
+                  {isInterview ? t('readyForInterview') : t('howCanIHelp')}
+                </Text>
+                <Text style={styles.welcomeText}>
+                  {isInterview ? t('interviewWelcome') : t('chatWelcome')}
+                </Text>
+                <View style={styles.starterPrompts}>
+                  {starterPrompts.map(prompt => (
+                    <Pressable
+                      key={prompt}
+                      accessibilityRole="button"
+                      onPress={() => handleSend(prompt)}
+                      disabled={isSending}
+                      style={styles.starterPrompt}
+                    >
+                      <Text style={styles.starterPromptText}>{prompt}</Text>
+                    </Pressable>
+                  ))}
                 </View>
               </View>
-            ))
-          )}
-          {isSending && !streamingResponse ? (
-            <View style={styles.typingRow}>
-              <View style={styles.assistantMark}>
-                <Text style={styles.assistantMarkText}>✦</Text>
+            )
+          }
+          ListFooterComponent={
+            isSending && !streamingResponse ? (
+              <View style={styles.typingRow}>
+                <View style={styles.assistantMark}>
+                  <Text style={styles.assistantMarkText}>✦</Text>
+                </View>
+                <View style={styles.typingBubble}>
+                  <TypingIndicator />
+                </View>
               </View>
-              <View style={styles.typingBubble}>
-                <TypingIndicator />
-              </View>
-            </View>
-          ) : null}
-        </ScrollView>
+            ) : undefined
+          }
+        />
 
         {error ? <Text style={styles.error}>{error}</Text> : null}
-        {voiceError ? <Text style={styles.voiceNotice}>ⓘ {voiceError}</Text> : null}
-
-        {document ? (
-          <View style={styles.selectedDocument}>
-            <Text numberOfLines={1} style={styles.selectedDocumentText}>
-              📎 {document.name} · {Math.ceil(document.size / 1024)} KB
-            </Text>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={t('removeAttachedDocument')}
-              onPress={() => setDocument(null)}
-              disabled={isSending}
-              style={styles.removeDocumentButton}>
-              <Text style={styles.removeDocumentText}>×</Text>
-            </Pressable>
-          </View>
+        {voiceError ? (
+          <Text style={styles.voiceNotice}>ⓘ {voiceError}</Text>
         ) : null}
 
         <View style={styles.composer}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('attachDocument')}
-            onPress={selectDocument}
-            disabled={isSending || isPickingDocument || isListening}
-            style={[
-              styles.documentButton,
-              (isSending || isPickingDocument || isListening) && styles.sendButtonDisabled,
-            ]}>
-            <Text style={styles.documentButtonText}>{isPickingDocument ? '…' : '📎'}</Text>
-          </Pressable>
-          <TextInput
-            ref={input}
-            value={draft}
-            onChangeText={setDraft}
-            placeholder={isInterview ? t('interviewAnswerPlaceholder') : t('messagePlaceholder')}
-            placeholderTextColor={colors.placeholder}
-            multiline
-            maxLength={6000}
-            editable={!isSending && !isListening}
-            style={styles.input}
-            accessibilityLabel={isInterview ? t('interviewAnswerLabel') : t('messageLabel')}
-          />
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={
-              isListening ? t('stopVoiceInput') : t('startVoiceInput')
-            }
-            accessibilityState={{ selected: isListening, busy: isStartingListening }}
-            onPress={toggleVoiceInput}
-            disabled={isSending || isStartingListening}
-            style={[
-              styles.voiceButton,
-              isListening && styles.voiceButtonActive,
-              (isSending || isStartingListening) && styles.sendButtonDisabled,
-            ]}>
-            <Text style={styles.voiceButtonText}>
-              {isStartingListening ? '…' : isListening ? '■' : '🎙'}
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t('sendMessage')}
-            onPress={() => handleSend()}
-            disabled={
-              (!draft.trim() && !document) ||
-              isSending ||
-              isLoadingMessages ||
-              !user?.id ||
-              isListening
-            }
-            style={[
-              styles.sendButton,
-              ((!draft.trim() && !document) || isSending || isLoadingMessages || !user?.id || isListening) &&
-                styles.sendButtonDisabled,
-            ]}>
-            <Text style={styles.sendButtonText}>↑</Text>
-          </Pressable>
+          {document ? (
+            <View style={styles.documentChip}>
+              <Text style={styles.documentChipBadge}>PDF</Text>
+              <Text numberOfLines={1} style={styles.documentChipName}>
+                {document.name}
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('removeAttachedDocument')}
+                onPress={() => setDocument(null)}
+                disabled={isSending}
+                style={styles.removeDocumentChipButton}
+              >
+                <Text style={styles.removeDocumentChipText}>×</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          <View style={styles.composerControls}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('attachDocument')}
+              onPress={selectDocument}
+              disabled={isSending || isPickingDocument || isListening}
+              style={[
+                styles.documentButton,
+                (isSending || isPickingDocument || isListening) &&
+                  styles.sendButtonDisabled,
+              ]}
+            >
+              <Text style={styles.documentButtonText}>
+                {isPickingDocument ? '…' : '📎'}
+              </Text>
+            </Pressable>
+            <View style={styles.inputArea}>
+              <TextInput
+                ref={input}
+                autoFocus={autoFocus}
+                value={draft}
+                onChangeText={setDraft}
+                placeholder={
+                  isInterview
+                    ? t('interviewAnswerPlaceholder')
+                    : t('messagePlaceholder')
+                }
+                placeholderTextColor={colors.placeholder}
+                multiline
+                maxLength={6000}
+                editable={!isSending && !isListening}
+                style={styles.input}
+                accessibilityLabel={
+                  isInterview ? t('interviewAnswerLabel') : t('messageLabel')
+                }
+              />
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={
+                isListening ? t('stopVoiceInput') : t('startVoiceInput')
+              }
+              accessibilityState={{
+                selected: isListening,
+                busy: isStartingListening,
+              }}
+              onPress={toggleVoiceInput}
+              disabled={isSending || isStartingListening}
+              style={[
+                styles.voiceButton,
+                isListening && styles.voiceButtonActive,
+                (isSending || isStartingListening) && styles.sendButtonDisabled,
+              ]}
+            >
+              <Text style={styles.voiceButtonText}>
+                {isStartingListening ? '…' : isListening ? '■' : '🎙'}
+              </Text>
+            </Pressable>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('sendMessage')}
+              onPress={() => handleSend()}
+              disabled={
+                (!draft.trim() && !document) ||
+                isSending ||
+                isLoadingMessages ||
+                !user?.id ||
+                isListening
+              }
+              style={[
+                styles.sendButton,
+                ((!draft.trim() && !document) ||
+                  isSending ||
+                  isLoadingMessages ||
+                  !user?.id ||
+                  isListening) &&
+                  styles.sendButtonDisabled,
+              ]}
+            >
+              <Text style={styles.sendButtonText}>↑</Text>
+            </Pressable>
+          </View>
         </View>
-        <Text style={styles.footerNote}>
-          {t('messagesPrivacyNote')}
-        </Text>
+        <Text style={styles.footerNote}>{t('messagesPrivacyNote')}</Text>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

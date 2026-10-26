@@ -14,8 +14,8 @@ export function createStyles(colors: AppTheme['colors'], isDark: boolean) {
     scrollContent: {
       flexGrow: 1,
       paddingHorizontal: 20,
-      paddingTop: 24,
-      paddingBottom: 40,
+      paddingTop: 12,
+      paddingBottom: 20,
     },
     backgroundGlow: {
       position: 'absolute',
@@ -38,8 +38,8 @@ export function createStyles(colors: AppTheme['colors'], isDark: boolean) {
       left: -90,
     },
     headerWrap: {
-      marginTop: 24,
-      marginBottom: 20,
+      marginTop: 12,
+      marginBottom: 12,
       zIndex: 1,
     },
     badge: {
@@ -52,7 +52,7 @@ export function createStyles(colors: AppTheme['colors'], isDark: boolean) {
       justifyContent: 'center',
       borderWidth: 1,
       borderColor: 'rgba(255,255,255,0.14)',
-      marginBottom: 20,
+      marginBottom: 12,
     },
     badgeText: {
       color: '#FFFFFF',
@@ -70,12 +70,12 @@ export function createStyles(colors: AppTheme['colors'], isDark: boolean) {
     },
     title: {
       color: colors.text,
-      fontSize: 36,
+      fontSize: 32,
       fontWeight: '800',
       letterSpacing: -1,
     },
     subtitle: {
-      marginTop: 10,
+      marginTop: 6,
       color: colors.textSecondary,
       fontSize: 16,
       lineHeight: 24,
@@ -85,7 +85,7 @@ export function createStyles(colors: AppTheme['colors'], isDark: boolean) {
       borderRadius: 30,
       borderWidth: 1,
       borderColor: colors.border,
-      padding: 25,
+      padding: 20,
       zIndex: 1,
       shadowColor: '#000000',
       shadowOffset: { width: 0, height: 18 },
@@ -97,8 +97,8 @@ export function createStyles(colors: AppTheme['colors'], isDark: boolean) {
       color: colors.text,
       fontSize: 14,
       fontWeight: '700',
-      marginBottom: 10,
-      marginTop: 6,
+      marginBottom: 8,
+      marginTop: 4,
     },
     inputWrap: {
       flexDirection: 'row',
@@ -108,8 +108,8 @@ export function createStyles(colors: AppTheme['colors'], isDark: boolean) {
       borderWidth: 1,
       borderColor: colors.border,
       paddingHorizontal: 14,
-      marginBottom: 20,
-      minHeight: 60,
+      marginBottom: 14,
+      minHeight: 54,
     },
     inputIcon: {
       fontSize: 18,
@@ -119,7 +119,7 @@ export function createStyles(colors: AppTheme['colors'], isDark: boolean) {
       flex: 1,
       color: colors.text,
       fontSize: 16,
-      paddingVertical: 16,
+      paddingVertical: 13,
     },
     eyeButton: {
       width: 32,
@@ -136,8 +136,8 @@ export function createStyles(colors: AppTheme['colors'], isDark: boolean) {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginTop: 6,
-      marginBottom: 22,
+      marginTop: 2,
+      marginBottom: 16,
     },
     forgotText: {
       color: colors.accent,
@@ -147,7 +147,7 @@ export function createStyles(colors: AppTheme['colors'], isDark: boolean) {
     primaryButton: {
       backgroundColor: colors.accent,
       borderRadius: 18,
-      paddingVertical: 18,
+      paddingVertical: 15,
       alignItems: 'center',
       justifyContent: 'center',
       shadowColor: colors.accent,
@@ -172,7 +172,7 @@ export function createStyles(colors: AppTheme['colors'], isDark: boolean) {
     dividerRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginVertical: 22,
+      marginVertical: 16,
     },
     divider: {
       flex: 1,
@@ -187,19 +187,24 @@ export function createStyles(colors: AppTheme['colors'], isDark: boolean) {
       letterSpacing: 1,
     },
     socialRow: {
-      flexDirection: 'row',
       gap: 12,
     },
     socialButton: {
-      flex: 1,
+      width: '100%',
+      height: 40,
       backgroundColor: colors.input,
-      borderRadius: 16,
+      borderRadius: 20,
       borderWidth: 1,
       borderColor: colors.border,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: 13,
+      paddingVertical: 0,
+    },
+    appleButton: {
+      width: '100%',
+      height: 40,
+      opacity: 1,
     },
     socialIcon: {
       width: 22,
@@ -212,7 +217,7 @@ export function createStyles(colors: AppTheme['colors'], isDark: boolean) {
       fontWeight: '600',
     },
     footer: {
-      marginTop: 28,
+      marginTop: 16,
       flexDirection: 'row',
       justifyContent: 'center',
       alignItems: 'center',

@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import type { StackScreenProps } from '@react-navigation/stack';
+import { AppleButton } from '@invertase/react-native-apple-authentication';
 
 import { useAuthStore } from '../../store/authStore';
 import { useTheme } from '../../../../theme';
@@ -32,6 +33,7 @@ export function LoginScreen({ navigation }: Props) {
 
   const login = useAuthStore(state => state.login);
   const loginWithGoogle = useAuthStore(state => state.loginWithGoogle);
+  const loginWithApple = useAuthStore(state => state.loginWithApple);
   const requestPasswordReset = useAuthStore(state => state.requestPasswordReset);
   const isLoading = useAuthStore(state => state.isLoading);
   const isEmailLoginLoading = useAuthStore(state => state.isEmailLoginLoading);
@@ -67,6 +69,14 @@ export function LoginScreen({ navigation }: Props) {
 
   const handleGoogleLogin = async () => {
     await loginWithGoogle();
+  };
+
+  const handleAppleLogin = async () => {
+    if (isLoading) {
+      return;
+    }
+
+    await loginWithApple();
   };
 
   return (
@@ -185,6 +195,16 @@ export function LoginScreen({ navigation }: Props) {
                   {isGoogleLoginLoading ? t('connecting') : t('continueWithGoogle')}
                 </Text>
               </Pressable>
+              {Platform.OS === 'ios' ? (
+                <AppleButton
+                  buttonType={AppleButton.Type.SIGN_IN}
+                  buttonStyle={isDark ? AppleButton.Style.WHITE : AppleButton.Style.BLACK}
+                  cornerRadius={16}
+                  style={styles.appleButton}
+                  onPress={handleAppleLogin}
+                  testID="continue-with-apple"
+                />
+              ) : null}
             </View>
           </View>
 

@@ -1,6 +1,7 @@
 import {
   EmailAuthProvider,
   GoogleAuthProvider,
+  OAuthProvider,
   createUserWithEmailAndPassword,
   deleteUser,
   onAuthStateChanged,
@@ -15,6 +16,7 @@ import {
 } from '@firebase/auth';
 import type { Unsubscribe } from '@firebase/auth';
 import { GoogleSignin } from '@react-native-google-signin/google-signin';
+import { appleAuth } from '@invertase/react-native-apple-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import {
@@ -36,7 +38,9 @@ function toAppUser(user: User): AppUser {
   return {
     id: user.uid,
     email: user.email ?? '',
-    name: user.displayName ?? user.email?.split('@')[0] ?? 'Kullanıcı',
+    // Apple private-relay addresses have opaque, random-looking prefixes.
+    // Never present that prefix as a person's name.
+    name: user.displayName?.trim() || 'Kullanıcı',
     avatar: user.photoURL ?? undefined,
   };
 }
@@ -121,6 +125,54 @@ export async function loginWithGoogle(): Promise<AppUser | null> {
       error !== null &&
       'code' in error &&
       error.code === 'SIGN_IN_CANCELLED'
+    ) {
+      return null;
+    }
+
+    throw new Error(toAuthError(error));
+  }
+}
+
+export async function loginWithApple(): Promise<AppUser | null> {
+  if (!isFirebaseConfigured()) {
+    throw new Error(
+      'Firebase yapılandırması eksik. src/config/firebase.ts dosyasındaki ayarları kontrol edin.',
+    );
+  }
+
+  try {
+    const response = await appleAuth.performRequest({
+      requestedOperation: appleAuth.Operation.LOGIN,
+      // Apple only returns these details on a person's first authorization.
+      requestedScopes: [appleAuth.Scope.FULL_NAME, appleAuth.Scope.EMAIL],
+    });
+
+    if (!response.identityToken) {
+      throw new Error('Apple kimlik belirteci alınamadı. Lütfen tekrar deneyin.');
+    }
+
+    const credential = new OAuthProvider('apple.com').credential({
+      idToken: response.identityToken,
+      rawNonce: response.nonce,
+    });
+    const result = await signInWithCredential(getFirebaseAuth(), credential);
+
+    const fullName = [response.fullName?.givenName, response.fullName?.familyName]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+
+    if (fullName) {
+      await updateProfile(result.user, { displayName: fullName });
+    }
+
+    return toAppUser(result.user);
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      String(error.code) === appleAuth.Error.CANCELED
     ) {
       return null;
     }
@@ -215,7 +267,7 @@ export async function updateUserProfile({
 
       if (!user.email || !hasPasswordProvider) {
         throw new Error(
-          'Google ile giriş yapılan hesapların şifresi buradan değiştirilemez.',
+          'Google veya Apple ile giriş yapılan hesapların şifresi buradan değiştirilemez.',
         );
       }
 

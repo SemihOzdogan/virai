@@ -1,9 +1,17 @@
-import type { ChatMode } from '../features/chat/types/chat';
+import type { ChatAttachment, ChatMode } from '../features/chat/types/chat';
 
 export type RootStackParamList = {
   Login: undefined;
   Register: undefined;
   Home: undefined;
   Adventure: undefined;
-  Chat: { conversationId: string; title?: string; mode?: ChatMode };
+  JobApplication: undefined;
+  Chat: {
+    conversationId: string;
+    title?: string;
+    mode?: ChatMode;
+    autoFocus?: boolean;
+    initialMessage?: string;
+    initialAttachments?: Array<ChatAttachment & { data: string }>;
+  };
 };

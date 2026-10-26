@@ -179,7 +179,12 @@ function ConversationRow({
                   {item.title}
                 </Text>
                 <Text style={styles.conversationMeta}>
-                  VirAI · {formatDate(item.updatedAt, language === 'tr' ? 'tr-TR' : 'en-US', t('justNow'))}
+                  VirAI ·{' '}
+                  {formatDate(
+                    item.updatedAt,
+                    language === 'tr' ? 'tr-TR' : 'en-US',
+                    t('justNow'),
+                  )}
                 </Text>
               </View>
               <Text style={styles.chevron}>›</Text>
@@ -301,7 +306,7 @@ export function HomeScreen({ navigation }: Props) {
     }
 
     const conversationId = createConversationId(user.id);
-    navigation.navigate('Chat', { conversationId });
+    navigation.navigate('Chat', { conversationId, autoFocus: true });
   };
 
   const startInterview = () => {
@@ -366,7 +371,9 @@ export function HomeScreen({ navigation }: Props) {
   };
   const saveProfile = async () => {
     const name = profileName.trim();
-    const isChangingPassword = Boolean(newPassword || confirmNewPassword || currentPassword);
+    const isChangingPassword = Boolean(
+      newPassword || confirmNewPassword || currentPassword,
+    );
 
     if (!name) {
       setProfileValidationError(t('profileNameRequired'));
@@ -509,11 +516,11 @@ export function HomeScreen({ navigation }: Props) {
         </View>
 
         <Text style={styles.greeting}>
-          {t('greeting', { name: user?.name ? `, ${user.name.split(' ')[0]}` : '' })}
+          {t('greeting', {
+            name: user?.name ? `, ${user.name.split(' ')[0]}` : '',
+          })}
         </Text>
-        <Text style={styles.description}>
-          {t('homeDescription')}
-        </Text>
+        <Text style={styles.description}>{t('homeDescription')}</Text>
 
         <Pressable
           accessibilityRole="button"
@@ -538,9 +545,31 @@ export function HomeScreen({ navigation }: Props) {
             <Text style={styles.interviewIconText}>⌁</Text>
           </View>
           <View style={styles.newChatCopy}>
-            <Text style={styles.interviewTitle}>{t('interviewSimulation')}</Text>
+            <Text style={styles.interviewTitle}>
+              {t('interviewSimulation')}
+            </Text>
             <Text style={styles.interviewSubtitle}>
               {t('interviewDescription')}
+            </Text>
+          </View>
+          <Text style={styles.interviewArrow}>›</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('startJobApplication')}
+          onPress={() => navigation.navigate('JobApplication')}
+          style={styles.interviewButton}
+        >
+          <View style={styles.interviewIcon}>
+            <Text style={styles.interviewIconText}>▣</Text>
+          </View>
+          <View style={styles.newChatCopy}>
+            <Text style={styles.interviewTitle}>
+              {t('jobApplicationPackage')}
+            </Text>
+            <Text style={styles.interviewSubtitle}>
+              {t('jobApplicationHomeDescription')}
             </Text>
           </View>
           <Text style={styles.interviewArrow}>›</Text>
@@ -575,7 +604,9 @@ export function HomeScreen({ navigation }: Props) {
               onPress={() => setDeleteAllConfirmationVisible(true)}
               style={styles.deleteAllChatsButton}
             >
-              <Text style={styles.deleteAllChatsText}>{t('deleteAllChats')}</Text>
+              <Text style={styles.deleteAllChatsText}>
+                {t('deleteAllChats')}
+              </Text>
             </Pressable>
           ) : null}
         </View>
@@ -602,16 +633,12 @@ export function HomeScreen({ navigation }: Props) {
           <View style={styles.emptyState}>
             <Text style={styles.emptyIcon}>✧</Text>
             <Text style={styles.emptyTitle}>{t('noChats')}</Text>
-            <Text style={styles.emptyText}>
-              {t('noChatsDescription')}
-            </Text>
+            <Text style={styles.emptyText}>{t('noChatsDescription')}</Text>
           </View>
         ) : visibleConversations.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyTitle}>{t('noResults')}</Text>
-            <Text style={styles.emptyText}>
-              {t('noResultsDescription')}
-            </Text>
+            <Text style={styles.emptyText}>{t('noResultsDescription')}</Text>
           </View>
         ) : (
           <FlatList
@@ -633,7 +660,9 @@ export function HomeScreen({ navigation }: Props) {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={t('close')}
-          onPress={() => !isDeletingAllChats && setDeleteAllConfirmationVisible(false)}
+          onPress={() =>
+            !isDeletingAllChats && setDeleteAllConfirmationVisible(false)
+          }
           style={styles.modalBackdrop}
         >
           <Pressable style={styles.deleteConfirmation} onPress={() => {}}>
@@ -660,7 +689,9 @@ export function HomeScreen({ navigation }: Props) {
                 style={styles.deleteConfirmButton}
               >
                 <Text style={styles.deleteConfirmText}>
-                  {isDeletingAllChats ? t('deletingAllChats') : t('deleteAllChats')}
+                  {isDeletingAllChats
+                    ? t('deletingAllChats')
+                    : t('deleteAllChats')}
                 </Text>
               </Pressable>
             </View>
@@ -735,101 +766,105 @@ export function HomeScreen({ navigation }: Props) {
             style={styles.modalBackdrop}
           >
             <Pressable style={styles.profileEditor} onPress={() => {}}>
-            <Text style={styles.deleteConfirmationTitle}>{t('editProfile')}</Text>
-            <Text style={styles.profileEditorDescription}>
-              {t('editProfileDescription')}
-            </Text>
+              <Text style={styles.deleteConfirmationTitle}>
+                {t('editProfile')}
+              </Text>
+              <Text style={styles.profileEditorDescription}>
+                {t('editProfileDescription')}
+              </Text>
 
-            <Text style={styles.profileEditorLabel}>{t('fullName')}</Text>
-            <TextInput
-              value={profileName}
-              onChangeText={value => {
-                setProfileName(value);
-                setProfileValidationError(null);
-              }}
-              placeholder={t('fullNamePlaceholder')}
-              placeholderTextColor={colors.placeholder}
-              autoCapitalize="words"
-              autoCorrect={false}
-              maxLength={80}
-              accessibilityLabel="Ad soyad"
-              style={styles.renameInput}
-            />
+              <Text style={styles.profileEditorLabel}>{t('fullName')}</Text>
+              <TextInput
+                value={profileName}
+                onChangeText={value => {
+                  setProfileName(value);
+                  setProfileValidationError(null);
+                }}
+                placeholder={t('fullNamePlaceholder')}
+                placeholderTextColor={colors.placeholder}
+                autoCapitalize="words"
+                autoCorrect={false}
+                maxLength={80}
+                accessibilityLabel="Ad soyad"
+                style={styles.renameInput}
+              />
 
-            <View style={styles.profileEditorDivider} />
-            <Text style={styles.profileEditorPasswordTitle}>{t('changePassword')}</Text>
-            <Text style={styles.profileEditorHint}>
-              {t('leavePasswordBlank')}
-            </Text>
-            <TextInput
-              value={currentPassword}
-              onChangeText={value => {
-                setCurrentPassword(value);
-                setProfileValidationError(null);
-              }}
-              placeholder={t('currentPassword')}
-              placeholderTextColor={colors.placeholder}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              accessibilityLabel="Mevcut şifre"
-              style={styles.profileEditorInput}
-            />
-            <TextInput
-              value={newPassword}
-              onChangeText={value => {
-                setNewPassword(value);
-                setProfileValidationError(null);
-              }}
-              placeholder={t('newPasswordPlaceholder')}
-              placeholderTextColor={colors.placeholder}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              accessibilityLabel="Yeni şifre"
-              style={styles.profileEditorInput}
-            />
-            <TextInput
-              value={confirmNewPassword}
-              onChangeText={value => {
-                setConfirmNewPassword(value);
-                setProfileValidationError(null);
-              }}
-              placeholder={t('confirmPassword')}
-              placeholderTextColor={colors.placeholder}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType="done"
-              onSubmitEditing={saveProfile}
-              accessibilityLabel="Yeni şifreyi tekrar gir"
-              style={styles.profileEditorInput}
-            />
+              <View style={styles.profileEditorDivider} />
+              <Text style={styles.profileEditorPasswordTitle}>
+                {t('changePassword')}
+              </Text>
+              <Text style={styles.profileEditorHint}>
+                {t('leavePasswordBlank')}
+              </Text>
+              <TextInput
+                value={currentPassword}
+                onChangeText={value => {
+                  setCurrentPassword(value);
+                  setProfileValidationError(null);
+                }}
+                placeholder={t('currentPassword')}
+                placeholderTextColor={colors.placeholder}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                accessibilityLabel="Mevcut şifre"
+                style={styles.profileEditorInput}
+              />
+              <TextInput
+                value={newPassword}
+                onChangeText={value => {
+                  setNewPassword(value);
+                  setProfileValidationError(null);
+                }}
+                placeholder={t('newPasswordPlaceholder')}
+                placeholderTextColor={colors.placeholder}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                accessibilityLabel="Yeni şifre"
+                style={styles.profileEditorInput}
+              />
+              <TextInput
+                value={confirmNewPassword}
+                onChangeText={value => {
+                  setConfirmNewPassword(value);
+                  setProfileValidationError(null);
+                }}
+                placeholder={t('confirmPassword')}
+                placeholderTextColor={colors.placeholder}
+                secureTextEntry
+                autoCapitalize="none"
+                autoCorrect={false}
+                returnKeyType="done"
+                onSubmitEditing={saveProfile}
+                accessibilityLabel="Yeni şifreyi tekrar gir"
+                style={styles.profileEditorInput}
+              />
 
-            {profileValidationError ? (
-              <Text style={styles.error}>{profileValidationError}</Text>
-            ) : null}
-            {error ? <Text style={styles.error}>{error}</Text> : null}
-            <View style={styles.deleteConfirmationActions}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={closeEditProfile}
-                disabled={isAuthLoading}
-                style={styles.deleteCancelButton}
-              >
-                <Text style={styles.deleteCancelText}>{t('cancel')}</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                onPress={saveProfile}
-                disabled={isAuthLoading}
-                style={styles.profileSaveButton}
-              >
-                <Text style={styles.deleteConfirmText}>
-                  {isAuthLoading ? t('saving') : t('save')}
-                </Text>
-              </Pressable>
-            </View>
+              {profileValidationError ? (
+                <Text style={styles.error}>{profileValidationError}</Text>
+              ) : null}
+              {error ? <Text style={styles.error}>{error}</Text> : null}
+              <View style={styles.deleteConfirmationActions}>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={closeEditProfile}
+                  disabled={isAuthLoading}
+                  style={styles.deleteCancelButton}
+                >
+                  <Text style={styles.deleteCancelText}>{t('cancel')}</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={saveProfile}
+                  disabled={isAuthLoading}
+                  style={styles.profileSaveButton}
+                >
+                  <Text style={styles.deleteConfirmText}>
+                    {isAuthLoading ? t('saving') : t('save')}
+                  </Text>
+                </Pressable>
+              </View>
             </Pressable>
           </Pressable>
         </KeyboardAvoidingView>
@@ -893,7 +928,9 @@ export function HomeScreen({ navigation }: Props) {
                 <Text style={styles.menuEditProfileIconText}>✎</Text>
               </View>
               <View style={styles.menuEditProfileCopy}>
-                <Text style={styles.menuEditProfileTitle}>{t('editProfile')}</Text>
+                <Text style={styles.menuEditProfileTitle}>
+                  {t('editProfile')}
+                </Text>
                 <Text style={styles.menuEditProfileSubtitle}>
                   {t('editProfileDescription')}
                 </Text>

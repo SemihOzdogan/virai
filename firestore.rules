@@ -12,7 +12,7 @@ service cloud.firestore {
         && data.title.size() > 0
         && data.title.size() <= 60
         && data.provider == 'gemini'
-        && (!data.keys().hasAny(['mode']) || data.mode in ['general', 'interview'])
+        && (!data.keys().hasAny(['mode']) || data.mode in ['general', 'interview', 'jobApplication'])
         && data.nextSequence is int
         && data.nextSequence >= 1
         && data.isGenerating is bool
@@ -26,7 +26,13 @@ service cloud.firestore {
       return data.name is string
         && data.name.size() > 0
         && data.name.size() <= 120
-        && data.mimeType in ['application/pdf', 'text/plain']
+        && data.mimeType in [
+          'application/pdf',
+          'text/plain',
+          'image/jpeg',
+          'image/png',
+          'image/webp'
+        ]
         && data.size is int
         && data.size > 0
         && data.size <= 12582912;
