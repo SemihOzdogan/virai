@@ -20,7 +20,9 @@ export function getFirebaseAppCheck() {
   const provider = new ReactNativeFirebaseAppCheckProvider();
   provider.configure({
     apple: {
-      provider: __DEV__ ? 'debug' : 'appAttestWithDeviceCheckFallback',
+      // Local development uses the registered debug provider; TestFlight and
+      // App Store builds use DeviceCheck after its Firebase registration.
+      provider: __DEV__ ? 'debug' : 'deviceCheck',
     },
     android: {
       provider: __DEV__ ? 'debug' : 'playIntegrity',
