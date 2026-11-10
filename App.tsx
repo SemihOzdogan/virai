@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import notifee, { EventType } from '@notifee/react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
+import { getFirebaseAppCheck } from './src/config/appCheck';
 import { SpeechPlayer } from './src/features/speech/components/SpeechPlayer';
 import { AppNavigator } from './src/navigation/AppNavigator';
 import { useSpeechStore } from './src/features/speech/store/speechStore';
@@ -23,6 +24,14 @@ const navigationRef = createNavigationContainerRef<RootStackParamList>();
 const pendingAdventureKey = 'virai-pending-adventure-open';
 
 export default function App() {
+  useEffect(() => {
+    try {
+      getFirebaseAppCheck();
+    } catch (error) {
+      console.warn('Firebase App Check başlatılamadı:', error);
+    }
+  }, []);
+
   useEffect(() => {
     const subscription = Linking.addEventListener('url', ({ url }) => {
       handleLiveActivityAction(url);

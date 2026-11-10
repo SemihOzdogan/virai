@@ -4,6 +4,7 @@ import {
   getGenerativeModel,
   GoogleAIBackend,
 } from '@react-native-firebase/ai';
+import { getFirebaseAppCheck } from '../../../config/appCheck';
 import {
   getStory,
   getAdventurePath,
@@ -149,7 +150,10 @@ export async function narrate(
   const chapter = Math.floor((turn - 1) / 3);
   const story = getStory(language);
   const model = getGenerativeModel(
-    getAI(getApp(), { backend: new GoogleAIBackend() }),
+    getAI(getApp(), {
+      appCheck: getFirebaseAppCheck(),
+      backend: new GoogleAIBackend(),
+    }),
     {
       model: 'gemini-3.1-flash-lite',
       generationConfig: {

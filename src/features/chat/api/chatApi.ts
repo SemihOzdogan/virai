@@ -23,6 +23,7 @@ import {
 } from '@firebase/firestore';
 
 import { getFirebaseApp } from '../../../config/firebase';
+import { getFirebaseAppCheck } from '../../../config/appCheck';
 import type {
   ChatAttachment,
   ChatMessage,
@@ -517,7 +518,10 @@ export async function sendChatMessage(
   try {
     const history = buildHistory(previousMessages);
 
-    const ai = getAI(getApp(), { backend: new GoogleAIBackend() });
+    const ai = getAI(getApp(), {
+      appCheck: getFirebaseAppCheck(),
+      backend: new GoogleAIBackend(),
+    });
     const systemInstructions = [
       getRuntimeDateInstruction(),
       ...(mode === 'interview' ? [INTERVIEW_SYSTEM_INSTRUCTION] : []),

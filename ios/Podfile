@@ -10,6 +10,11 @@ prepare_react_native_project!
 
 $RNFirebaseDisableSPM = true
 
+# React Native 0.87's prebuilt core can select the Release flavor for a Debug
+# link, which leaves Fabric's debug-only C++ symbols unresolved. Build the core
+# from source so the React Core variant matches the app configuration.
+ENV['RCT_USE_PREBUILT_RNCORE'] = '0'
+
 linkage = ENV['USE_FRAMEWORKS']
 if linkage != nil
   Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
@@ -39,6 +44,22 @@ target 'virai' do
     installer.pods_project.targets.each do |target|
       target.build_configurations.each do |build_config|
         build_config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+
+        # The Hermes prebuilt package contains the matching Apple Silicon
+        # simulator slice. Excluding x86_64 avoids linking a stale/incompatible
+        # Hermes binary when Xcode builds for an Apple Silicon simulator.
+        build_config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'x86_64'
+
+        # Hermes selects its prebuilt binary from GCC_PREPROCESSOR_DEFINITIONS.
+        # CocoaPods does not inherit DEBUG=1 for pod targets, so without this
+        # the Debug app can accidentally link Hermes' Release binary, which
+        # omits the CDP/debugger symbols used by React Native 0.87.
+        if target.name == 'hermes-engine' && build_config.name == 'Debug'
+          definitions = build_config.build_settings['GCC_PREPROCESSOR_DEFINITIONS']
+          definitions = definitions.is_a?(Array) ? definitions : [definitions].compact
+          definitions << 'DEBUG=1' unless definitions.include?('DEBUG=1')
+          build_config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = definitions
+        end
       end
     end
   end
